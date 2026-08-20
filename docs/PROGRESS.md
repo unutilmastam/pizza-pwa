@@ -3,7 +3,7 @@
 > Har seans boshida shu faylni o'qi. Faqat "Joriy bosqich" deb belgilangan
 > ishni bajar. Boshqa bosqichlarga o'tma. Tugagach shu faylni yangila.
 
-**Joriy bosqich: 1**
+**Joriy bosqich: 2**
 
 ---
 
@@ -80,7 +80,7 @@ Izoh:
 ---
 
 ## Bosqich 1 — menyu
-Status: **joriy**
+Status: **bajarildi**
 
 `js/pages/menu.js`, `js/pages/product.js`
 - `menu/current` bitta hujjat, localStorage'ga `version` bilan keshlanadi
@@ -90,11 +90,50 @@ Status: **joriy**
 - Mahsulot bottom-sheet: galereya, o'lcham, xamir, addon, remove, miqdor
 
 Izoh:
+- `js/db.js` da yozildi: `getMenu()`, `getMenuVersion()`,
+  `getCachedMenuVersion()`, `getStopList()`. Kesh mantiqi: localStorage'da
+  10 daqiqadan yangi kesh bo'lsa Firestore'ga **umuman murojaat qilinmaydi**;
+  eskirgan bo'lsa hujjat o'qilib kesh yangilanadi; tarmoq uzilgan bo'lsa
+  eski kesh qaytadi. Qolgan funksiyalar hamon kontrakt holida.
+- `js/pages/menu.js` — sticky qidiruv + chiplar, kategoriya bo'limlari,
+  scroll-spy, stop-list, skeleton, xato holati "Qayta urinish" bilan.
+- `js/pages/product.js` — bottom-sheet: scroll-snap galereya + nuqtalar,
+  o'lcham/xamir segment tanlagichi, addon ro'yxati, olib tashlash chiplari,
+  miqdor va real vaqtdagi narx. **Router sahifasi emas** — `menu.js` uni
+  bevosita chaqiradi, chunki oyna menyu ustida ochilishi kerak.
+  Deep-link (`#/product/:id`) kerak bo'lsa keyin qo'shiladi.
+- Xamir tanlagichi variantlardan hosil qilinadi: `seed-menu.json` da har
+  o'lchamda bitta xamir bor, shuning uchun blok ko'rinmaydi. Menyuga
+  `dough: "thin"` variantlari qo'shilsa — o'zi paydo bo'ladi.
+- Rasmlar hali yo'q (`images/products/*.jpg` 404 beradi) — `onerror` bilan
+  kategoriya emojisi ko'rsatiladi, interfeys buzilmaydi.
+- Stop-list `state.branchId` bo'lgandagina Firestore'dan o'qiladi. Filial
+  tanlash 3-bosqichda, shungacha ro'yxat bo'sh; `active: false` mahsulot
+  esa hozir ham kulrang bo'ladi.
+- Bu bosqichda qilinmadi (PROGRESS ro'yxatida yo'q): banner slayder,
+  filtrlar (vegetarian/achchiq/narx), sevimlilar, pitsa konstruktori.
+- Tuzatilgan xato: `render()` ma'lumotni `await` qilib turgani uchun router
+  sahifani DOM'ga kech qo'yardi va **skeleton umuman ko'rinmasdi**. Endi
+  karkas darhol qaytariladi, ma'lumot fonda yuklanadi (skeleton ~60 ms da
+  chiqadi). Yana ikkita mayda tuzatish: oxirgi chip bosilganda scroll-spy
+  uni bosib ketardi (endi 800 ms "lock" va sahifa oxiri hisobga olinadi);
+  og'irlik birligi "г" qotib qolgan edi (endi `unit.g`).
+- `sw.js` `VERSION = 'v3'`, yangi sahifa modullari app shell ro'yxatida.
+- Tekshirildi (Chromium 390×844, soxta `db.js` bilan): 3 bo'lim / 10
+  kartochka, chiplar va scroll-spy (oxirgi bo'lim ham), qidiruv 300 ms
+  debounce bilan ("tovuq" → 3 ta natija, "zzzz" → topilmadi, tozalash
+  qaytaradi), stop-listdagi Margarita kulrang va bosilmaydi, Pepperoni
+  oynasida 35 sm o'chirilgan, narx 45 000 → 30 sm 65 000 → mozzarella
+  bilan 77 000 → 2 dona 154 000, savatga qo'shilgach badge 2 va
+  localStorage'da to'g'ri `unitPrice`. Haqiqiy `db.js` bilan: yangi keshda
+  0 ta tarmoq so'rovi, eskirgan kesh + tarmoqsiz holatda eski menyu
+  qaytadi, kesh yo'q + tarmoqsiz holatda xato ekrani chiqadi.
+  Konsolda xato yo'q (rasm 404'laridan boshqa).
 
 ---
 
 ## Bosqich 2 — savat va checkout
-Status: boshlanmagan
+Status: **joriy**
 
 `js/pages/cart.js`, `js/pages/checkout.js`
 - Savat: miqdor, o'chirish undo bilan, promokod, minimal summa

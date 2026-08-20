@@ -3,13 +3,48 @@
  * Boshqa hech qaysi modulda `getDoc`, `setDoc`, `collection` chaqirilmaydi —
  * sahifalar faqat shu yerdagi funksiyalarni ishlatadi.
  *
- * 0-bosqichda bu fayl — shartnoma (kontrakt): funksiya nomlari, parametrlari
- * va qaytish qiymatlari belgilangan, tanasi keyingi bosqichlarda yoziladi:
- *   menyu → 1-bosqich, savat/checkout → 2, manzil/filial → 3,
+ * Tanasi bosqichma-bosqich to'ldiriladi:
+ *   menyu → 1-bosqich (yozildi), savat/checkout → 2, manzil/filial → 3,
  *   auth/foydalanuvchi → 4, buyurtma va treking → 5.
+ * Hali yozilmagan funksiyalar shartnoma (kontrakt) sifatida turibdi.
  */
 
 /* eslint-disable no-unused-vars */
+
+import { getFirebase, STORAGE_KEYS } from './config.js';
+
+/**
+ * Menyu keshining yashash muddati (ms). Shu vaqt ichida Firestore'ga
+ * umuman murojaat qilinmaydi — SPEC'dagi eng muhim optimizatsiya.
+ */
+const MENU_TTL = 10 * 60 * 1000;
+
+/**
+ * localStorage'dan JSON o'qiydi.
+ * @param {string} key
+ * @returns {?object}
+ */
+function readCache(key) {
+  try {
+    const raw = localStorage.getItem(key);
+    return raw ? JSON.parse(raw) : null;
+  } catch (e) {
+    return null;
+  }
+}
+
+/**
+ * localStorage'ga JSON yozadi. Xotira to'lgan bo'lsa jim o'tadi.
+ * @param {string} key
+ * @param {object} value
+ */
+function writeCache(key, value) {
+  try {
+    localStorage.setItem(key, JSON.stringify(value));
+  } catch (e) {
+    /* kesh ixtiyoriy — yozilmasa ham ilova ishlaydi */
+  }
+}
 
 /* ------------------------------------------------------------- sozlamalar */
 
@@ -24,18 +59,55 @@ export async function getSettings() {}
 
 /**
  * `menu/current` — bitta hujjat, butun katalog.
- * Avval localStorage keshidagi `version` bilan solishtiriladi; versiya
- * o'zgarmagan bo'lsa Firestore'ga umuman murojaat qilinmaydi.
- * @param {{force?: boolean}} [opts] - keshni chetlab o'tish
+ *
+ * Tartib:
+ *  1. localStorage'da yangi kesh bo'lsa (TTL ichida) — Firestore'ga
+ *     murojaat QILINMAYDI, kesh qaytadi;
+ *  2. aks holda hujjat o'qiladi va keshga yoziladi;
+ *  3. tarmoq uzilgan bo'lsa — eski kesh qaytadi (oflaynda menyu ko'rinadi).
+ *
+ * @param {{force?: boolean}} [opts] - `force: true` keshni chetlab o'tadi
  * @returns {Promise<{version: number, categories: object[], products: object[]}>}
  */
-export async function getMenu(opts) {}
+export async function getMenu(opts = {}) {
+  const cached = readCache(STORAGE_KEYS.menu);
+  const isFresh = cached && Date.now() - (cached.fetchedAt || 0) < MENU_TTL;
+  if (cached && isFresh && !opts.force) return cached.data;
+
+  try {
+    const { dbx, sdk } = await getFirebase();
+    const snap = await sdk.getDoc(sdk.doc(dbx, 'menu', 'current'));
+    if (!snap.exists()) throw new Error('menu/current hujjati topilmadi');
+
+    const data = snap.data();
+    // Versiya o'zgarmagan bo'lsa ham fetchedAt yangilanadi — keyingi TTL
+    // davomida yana so'rov ketmaydi.
+    writeCache(STORAGE_KEYS.menu, { fetchedAt: Date.now(), version: data.version, data });
+    return data;
+  } catch (e) {
+    if (cached) return cached.data;
+    throw e;
+  }
+}
 
 /**
- * Menyuning faqat `version` maydonini o'qiydi — kesh eskirganini tekshirish uchun.
- * @returns {Promise<number>}
+ * Menyuning `version` maydonini o'qiydi — kesh eskirganini tekshirish uchun.
+ * @returns {Promise<?number>}
  */
-export async function getMenuVersion() {}
+export async function getMenuVersion() {
+  const { dbx, sdk } = await getFirebase();
+  const snap = await sdk.getDoc(sdk.doc(dbx, 'menu', 'current'));
+  return snap.exists() ? snap.data().version : null;
+}
+
+/**
+ * Keshlangan menyu versiyasi (tarmoqsiz).
+ * @returns {?number}
+ */
+export function getCachedMenuVersion() {
+  const cached = readCache(STORAGE_KEYS.menu);
+  return cached ? cached.version ?? null : null;
+}
 
 /* ------------------------------------------------------------------ filial */
 
@@ -54,10 +126,18 @@ export async function getBranch(branchId) {}
 
 /**
  * Filialdagi stop-list (tugagan mahsulot va variantlar ro'yxati).
- * @param {string} branchId
+ * Filial tanlanmagan bo'lsa bo'sh ro'yxat qaytadi.
+ * @param {?string} branchId
  * @returns {Promise<string[]>}
  */
-export async function getStopList(branchId) {}
+export async function getStopList(branchId) {
+  if (!branchId) return [];
+  const { dbx, sdk } = await getFirebase();
+  const snap = await sdk.getDoc(sdk.doc(dbx, 'branches', branchId));
+  if (!snap.exists()) return [];
+  const list = snap.data().stopList;
+  return Array.isArray(list) ? list : [];
+}
 
 /* ----------------------------------------------------------------- banner */
 
