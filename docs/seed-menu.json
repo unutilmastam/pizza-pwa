@@ -1,0 +1,341 @@
+{
+  "version": 1,
+  "updatedAt": "2026-08-20T09:00:00.000Z",
+  "categories": [
+    {
+      "id": "cat-pizza",
+      "name": { "uz": "Pitsa", "ru": "Пицца", "en": "Pizza" },
+      "icon": "🍕",
+      "order": 1
+    },
+    {
+      "id": "cat-drink",
+      "name": { "uz": "Ichimlik", "ru": "Напитки", "en": "Drinks" },
+      "icon": "🥤",
+      "order": 2
+    },
+    {
+      "id": "cat-snack",
+      "name": { "uz": "Zakuska", "ru": "Закуски", "en": "Snacks" },
+      "icon": "🍟",
+      "order": 3
+    }
+  ],
+  "products": [
+    {
+      "id": "p-pepperoni",
+      "categoryId": "cat-pizza",
+      "name": { "uz": "Pepperoni", "ru": "Пепперони", "en": "Pepperoni" },
+      "description": {
+        "uz": "Achchiqroq pepperoni kolbasasi, mozzarella va firma tomat sousi.",
+        "ru": "Пикантная колбаса пепперони, моцарелла и фирменный томатный соус.",
+        "en": "Spicy pepperoni sausage, mozzarella and our signature tomato sauce."
+      },
+      "images": [
+        "images/products/pepperoni-1.jpg",
+        "images/products/pepperoni-2.jpg"
+      ],
+      "badges": ["hit"],
+      "variants": [
+        { "id": "p-pepperoni-25", "size": "25", "dough": "traditional", "price": 45000, "weight": 400, "kcal": 890 },
+        { "id": "p-pepperoni-30", "size": "30", "dough": "traditional", "price": 65000, "weight": 570, "kcal": 1270 },
+        { "id": "p-pepperoni-35", "size": "35", "dough": "traditional", "price": 85000, "weight": 780, "kcal": 1740 }
+      ],
+      "addons": [
+        { "id": "add-mozzarella", "name": { "uz": "Qo'shimcha mozzarella", "ru": "Дополнительная моцарелла", "en": "Extra mozzarella" }, "price": 12000 },
+        { "id": "add-pepperoni", "name": { "uz": "Qo'shimcha pepperoni", "ru": "Дополнительная пепперони", "en": "Extra pepperoni" }, "price": 15000 },
+        { "id": "add-jalapeno", "name": { "uz": "Xalapeno", "ru": "Халапеньо", "en": "Jalapeño" }, "price": 8000 },
+        { "id": "add-mushroom", "name": { "uz": "Qo'ziqorin", "ru": "Шампиньоны", "en": "Mushrooms" }, "price": 9000 },
+        { "id": "add-cheese-crust", "name": { "uz": "Pishloqli bort", "ru": "Сырный борт", "en": "Cheese crust" }, "price": 14000 }
+      ],
+      "removable": [
+        { "id": "rem-pepperoni", "name": { "uz": "Pepperoni", "ru": "Пепперони", "en": "Pepperoni" } },
+        { "id": "rem-tomato-sauce", "name": { "uz": "Tomat sousi", "ru": "Томатный соус", "en": "Tomato sauce" } },
+        { "id": "rem-oregano", "name": { "uz": "Origano", "ru": "Орегано", "en": "Oregano" } }
+      ],
+      "isCombo": false,
+      "comboItems": [],
+      "order": 1,
+      "active": true
+    },
+    {
+      "id": "p-margarita",
+      "categoryId": "cat-pizza",
+      "name": { "uz": "Margarita", "ru": "Маргарита", "en": "Margherita" },
+      "description": {
+        "uz": "Mozzarella, yangi pomidor, rayhon va zaytun moyi. Klassika.",
+        "ru": "Моцарелла, свежие томаты, базилик и оливковое масло. Классика.",
+        "en": "Mozzarella, fresh tomatoes, basil and olive oil. A classic."
+      },
+      "images": [
+        "images/products/margarita-1.jpg",
+        "images/products/margarita-2.jpg"
+      ],
+      "badges": ["veg"],
+      "variants": [
+        { "id": "p-margarita-25", "size": "25", "dough": "traditional", "price": 39000, "weight": 380, "kcal": 780 },
+        { "id": "p-margarita-30", "size": "30", "dough": "traditional", "price": 56000, "weight": 540, "kcal": 1110 },
+        { "id": "p-margarita-35", "size": "35", "dough": "traditional", "price": 74000, "weight": 740, "kcal": 1520 }
+      ],
+      "addons": [
+        { "id": "add-mozzarella", "name": { "uz": "Qo'shimcha mozzarella", "ru": "Дополнительная моцарелла", "en": "Extra mozzarella" }, "price": 12000 },
+        { "id": "add-tomato", "name": { "uz": "Pomidor", "ru": "Томаты", "en": "Tomatoes" }, "price": 7000 },
+        { "id": "add-olive", "name": { "uz": "Zaytun", "ru": "Оливки", "en": "Olives" }, "price": 8000 },
+        { "id": "add-mushroom", "name": { "uz": "Qo'ziqorin", "ru": "Шампиньоны", "en": "Mushrooms" }, "price": 9000 },
+        { "id": "add-cheese-crust", "name": { "uz": "Pishloqli bort", "ru": "Сырный борт", "en": "Cheese crust" }, "price": 14000 }
+      ],
+      "removable": [
+        { "id": "rem-basil", "name": { "uz": "Rayhon", "ru": "Базилик", "en": "Basil" } },
+        { "id": "rem-tomato", "name": { "uz": "Pomidor", "ru": "Томаты", "en": "Tomatoes" } },
+        { "id": "rem-oregano", "name": { "uz": "Origano", "ru": "Орегано", "en": "Oregano" } }
+      ],
+      "isCombo": false,
+      "comboItems": [],
+      "order": 2,
+      "active": true
+    },
+    {
+      "id": "p-four-cheese",
+      "categoryId": "cat-pizza",
+      "name": { "uz": "To'rt pishloq", "ru": "Четыре сыра", "en": "Four Cheese" },
+      "description": {
+        "uz": "Mozzarella, chedder, dor-blyu va parmezan qaymoqli asosda.",
+        "ru": "Моцарелла, чеддер, дор-блю и пармезан на сливочной основе.",
+        "en": "Mozzarella, cheddar, blue cheese and parmesan on a cream base."
+      },
+      "images": [
+        "images/products/four-cheese-1.jpg",
+        "images/products/four-cheese-2.jpg"
+      ],
+      "badges": ["veg", "hit"],
+      "variants": [
+        { "id": "p-four-cheese-25", "size": "25", "dough": "traditional", "price": 52000, "weight": 410, "kcal": 1010 },
+        { "id": "p-four-cheese-30", "size": "30", "dough": "traditional", "price": 74000, "weight": 580, "kcal": 1430 },
+        { "id": "p-four-cheese-35", "size": "35", "dough": "traditional", "price": 95000, "weight": 790, "kcal": 1950 }
+      ],
+      "addons": [
+        { "id": "add-mozzarella", "name": { "uz": "Qo'shimcha mozzarella", "ru": "Дополнительная моцарелла", "en": "Extra mozzarella" }, "price": 12000 },
+        { "id": "add-parmesan", "name": { "uz": "Parmezan", "ru": "Пармезан", "en": "Parmesan" }, "price": 13000 },
+        { "id": "add-mushroom", "name": { "uz": "Qo'ziqorin", "ru": "Шампиньоны", "en": "Mushrooms" }, "price": 9000 },
+        { "id": "add-walnut", "name": { "uz": "Yong'oq", "ru": "Грецкий орех", "en": "Walnuts" }, "price": 10000 },
+        { "id": "add-cheese-crust", "name": { "uz": "Pishloqli bort", "ru": "Сырный борт", "en": "Cheese crust" }, "price": 14000 }
+      ],
+      "removable": [
+        { "id": "rem-blue-cheese", "name": { "uz": "Dor-blyu", "ru": "Дор-блю", "en": "Blue cheese" } },
+        { "id": "rem-parmesan", "name": { "uz": "Parmezan", "ru": "Пармезан", "en": "Parmesan" } },
+        { "id": "rem-oregano", "name": { "uz": "Origano", "ru": "Орегано", "en": "Oregano" } }
+      ],
+      "isCombo": false,
+      "comboItems": [],
+      "order": 3,
+      "active": true
+    },
+    {
+      "id": "p-meat",
+      "categoryId": "cat-pizza",
+      "name": { "uz": "Go'shtli", "ru": "Мясная", "en": "Meat Lovers" },
+      "description": {
+        "uz": "Mol go'shti, tovuq filesi, pepperoni, piyoz va mozzarella.",
+        "ru": "Говядина, куриное филе, пепперони, лук и моцарелла.",
+        "en": "Beef, chicken fillet, pepperoni, onion and mozzarella."
+      },
+      "images": [
+        "images/products/meat-1.jpg",
+        "images/products/meat-2.jpg"
+      ],
+      "badges": ["hit"],
+      "variants": [
+        { "id": "p-meat-25", "size": "25", "dough": "traditional", "price": 49000, "weight": 430, "kcal": 960 },
+        { "id": "p-meat-30", "size": "30", "dough": "traditional", "price": 69000, "weight": 610, "kcal": 1370 },
+        { "id": "p-meat-35", "size": "35", "dough": "traditional", "price": 89000, "weight": 830, "kcal": 1870 }
+      ],
+      "addons": [
+        { "id": "add-mozzarella", "name": { "uz": "Qo'shimcha mozzarella", "ru": "Дополнительная моцарелла", "en": "Extra mozzarella" }, "price": 12000 },
+        { "id": "add-beef", "name": { "uz": "Qo'shimcha mol go'shti", "ru": "Дополнительная говядина", "en": "Extra beef" }, "price": 16000 },
+        { "id": "add-bacon", "name": { "uz": "Bekon", "ru": "Бекон", "en": "Bacon" }, "price": 14000 },
+        { "id": "add-jalapeno", "name": { "uz": "Xalapeno", "ru": "Халапеньо", "en": "Jalapeño" }, "price": 8000 },
+        { "id": "add-cheese-crust", "name": { "uz": "Pishloqli bort", "ru": "Сырный борт", "en": "Cheese crust" }, "price": 14000 }
+      ],
+      "removable": [
+        { "id": "rem-onion", "name": { "uz": "Piyoz", "ru": "Лук", "en": "Onion" } },
+        { "id": "rem-pepperoni", "name": { "uz": "Pepperoni", "ru": "Пепперони", "en": "Pepperoni" } },
+        { "id": "rem-tomato-sauce", "name": { "uz": "Tomat sousi", "ru": "Томатный соус", "en": "Tomato sauce" } }
+      ],
+      "isCombo": false,
+      "comboItems": [],
+      "order": 4,
+      "active": true
+    },
+    {
+      "id": "p-bbq-chicken",
+      "categoryId": "cat-pizza",
+      "name": { "uz": "Barbekyu tovuq", "ru": "Барбекю с курицей", "en": "BBQ Chicken" },
+      "description": {
+        "uz": "Tovuq filesi, barbekyu sousi, makkajo'xori, qizil piyoz va mozzarella.",
+        "ru": "Куриное филе, соус барбекю, кукуруза, красный лук и моцарелла.",
+        "en": "Chicken fillet, BBQ sauce, sweet corn, red onion and mozzarella."
+      },
+      "images": [
+        "images/products/bbq-chicken-1.jpg",
+        "images/products/bbq-chicken-2.jpg"
+      ],
+      "badges": ["new"],
+      "variants": [
+        { "id": "p-bbq-chicken-25", "size": "25", "dough": "traditional", "price": 47000, "weight": 420, "kcal": 900 },
+        { "id": "p-bbq-chicken-30", "size": "30", "dough": "traditional", "price": 67000, "weight": 590, "kcal": 1290 },
+        { "id": "p-bbq-chicken-35", "size": "35", "dough": "traditional", "price": 87000, "weight": 800, "kcal": 1760 }
+      ],
+      "addons": [
+        { "id": "add-mozzarella", "name": { "uz": "Qo'shimcha mozzarella", "ru": "Дополнительная моцарелла", "en": "Extra mozzarella" }, "price": 12000 },
+        { "id": "add-chicken", "name": { "uz": "Qo'shimcha tovuq", "ru": "Дополнительная курица", "en": "Extra chicken" }, "price": 15000 },
+        { "id": "add-corn", "name": { "uz": "Makkajo'xori", "ru": "Кукуруза", "en": "Sweet corn" }, "price": 7000 },
+        { "id": "add-bbq-sauce", "name": { "uz": "Barbekyu sousi", "ru": "Соус барбекю", "en": "BBQ sauce" }, "price": 6000 },
+        { "id": "add-cheese-crust", "name": { "uz": "Pishloqli bort", "ru": "Сырный борт", "en": "Cheese crust" }, "price": 14000 }
+      ],
+      "removable": [
+        { "id": "rem-onion", "name": { "uz": "Piyoz", "ru": "Лук", "en": "Onion" } },
+        { "id": "rem-corn", "name": { "uz": "Makkajo'xori", "ru": "Кукуруза", "en": "Sweet corn" } },
+        { "id": "rem-bbq-sauce", "name": { "uz": "Barbekyu sousi", "ru": "Соус барбекю", "en": "BBQ sauce" } }
+      ],
+      "isCombo": false,
+      "comboItems": [],
+      "order": 5,
+      "active": true
+    },
+    {
+      "id": "p-diablo",
+      "categoryId": "cat-pizza",
+      "name": { "uz": "Diablo", "ru": "Дьябло", "en": "Diablo" },
+      "description": {
+        "uz": "Achchiq salyami, xalapeno, chili qalampiri va mozzarella. O'tkir.",
+        "ru": "Острая салями, халапеньо, перец чили и моцарелла. Очень остро.",
+        "en": "Spicy salami, jalapeño, chili pepper and mozzarella. Seriously hot."
+      },
+      "images": [
+        "images/products/diablo-1.jpg",
+        "images/products/diablo-2.jpg"
+      ],
+      "badges": ["spicy", "new"],
+      "variants": [
+        { "id": "p-diablo-25", "size": "25", "dough": "traditional", "price": 48000, "weight": 410, "kcal": 930 },
+        { "id": "p-diablo-30", "size": "30", "dough": "traditional", "price": 68000, "weight": 580, "kcal": 1330 },
+        { "id": "p-diablo-35", "size": "35", "dough": "traditional", "price": 88000, "weight": 790, "kcal": 1810 }
+      ],
+      "addons": [
+        { "id": "add-mozzarella", "name": { "uz": "Qo'shimcha mozzarella", "ru": "Дополнительная моцарелла", "en": "Extra mozzarella" }, "price": 12000 },
+        { "id": "add-salami", "name": { "uz": "Qo'shimcha salyami", "ru": "Дополнительная салями", "en": "Extra salami" }, "price": 15000 },
+        { "id": "add-jalapeno", "name": { "uz": "Xalapeno", "ru": "Халапеньо", "en": "Jalapeño" }, "price": 8000 },
+        { "id": "add-olive", "name": { "uz": "Zaytun", "ru": "Оливки", "en": "Olives" }, "price": 8000 },
+        { "id": "add-cheese-crust", "name": { "uz": "Pishloqli bort", "ru": "Сырный борт", "en": "Cheese crust" }, "price": 14000 }
+      ],
+      "removable": [
+        { "id": "rem-jalapeno", "name": { "uz": "Xalapeno", "ru": "Халапеньо", "en": "Jalapeño" } },
+        { "id": "rem-chili", "name": { "uz": "Chili qalampiri", "ru": "Перец чили", "en": "Chili pepper" } },
+        { "id": "rem-onion", "name": { "uz": "Piyoz", "ru": "Лук", "en": "Onion" } }
+      ],
+      "isCombo": false,
+      "comboItems": [],
+      "order": 6,
+      "active": true
+    },
+    {
+      "id": "d-coca-cola",
+      "categoryId": "cat-drink",
+      "name": { "uz": "Coca-Cola", "ru": "Coca-Cola", "en": "Coca-Cola" },
+      "description": {
+        "uz": "Sovutilgan gazlangan ichimlik.",
+        "ru": "Охлаждённый газированный напиток.",
+        "en": "Chilled carbonated soft drink."
+      },
+      "images": ["images/products/coca-cola-1.jpg"],
+      "badges": [],
+      "variants": [
+        { "id": "d-coca-cola-050", "size": "0.5 l", "price": 12000, "weight": 500, "kcal": 210 },
+        { "id": "d-coca-cola-100", "size": "1 l", "price": 18000, "weight": 1000, "kcal": 420 }
+      ],
+      "addons": [],
+      "removable": [],
+      "isCombo": false,
+      "comboItems": [],
+      "order": 7,
+      "active": true
+    },
+    {
+      "id": "d-orange-fresh",
+      "categoryId": "cat-drink",
+      "name": { "uz": "Apelsin fresh", "ru": "Апельсиновый фреш", "en": "Orange fresh" },
+      "description": {
+        "uz": "Buyurtma berilgandan keyin siqiladigan yangi apelsin sharbati.",
+        "ru": "Свежевыжатый апельсиновый сок, готовим после заказа.",
+        "en": "Freshly squeezed orange juice, pressed after you order."
+      },
+      "images": ["images/products/orange-fresh-1.jpg"],
+      "badges": ["veg"],
+      "variants": [
+        { "id": "d-orange-fresh-040", "size": "0.4 l", "price": 28000, "weight": 400, "kcal": 180 }
+      ],
+      "addons": [],
+      "removable": [],
+      "isCombo": false,
+      "comboItems": [],
+      "order": 8,
+      "active": true
+    },
+    {
+      "id": "s-french-fries",
+      "categoryId": "cat-snack",
+      "name": { "uz": "Kartoshka fri", "ru": "Картофель фри", "en": "French fries" },
+      "description": {
+        "uz": "Qarsildoq kartoshka fri, dengiz tuzi bilan.",
+        "ru": "Хрустящий картофель фри с морской солью.",
+        "en": "Crispy french fries with sea salt."
+      },
+      "images": ["images/products/french-fries-1.jpg"],
+      "badges": ["veg"],
+      "variants": [
+        { "id": "s-french-fries-std", "size": "Standart", "price": 18000, "weight": 150, "kcal": 440 },
+        { "id": "s-french-fries-big", "size": "Katta", "price": 26000, "weight": 250, "kcal": 730 }
+      ],
+      "addons": [
+        { "id": "add-cheese-sauce", "name": { "uz": "Pishloqli sous", "ru": "Сырный соус", "en": "Cheese sauce" }, "price": 6000 },
+        { "id": "add-garlic-sauce", "name": { "uz": "Sarimsoqli sous", "ru": "Чесночный соус", "en": "Garlic sauce" }, "price": 6000 },
+        { "id": "add-ketchup", "name": { "uz": "Ketchup", "ru": "Кетчуп", "en": "Ketchup" }, "price": 4000 }
+      ],
+      "removable": [
+        { "id": "rem-salt", "name": { "uz": "Tuz", "ru": "Соль", "en": "Salt" } }
+      ],
+      "isCombo": false,
+      "comboItems": [],
+      "order": 9,
+      "active": true
+    },
+    {
+      "id": "s-chicken-wings",
+      "categoryId": "cat-snack",
+      "name": { "uz": "Tovuq qanotchalari", "ru": "Куриные крылышки", "en": "Chicken wings" },
+      "description": {
+        "uz": "Barbekyu sousida pishirilgan tovuq qanotchalari.",
+        "ru": "Куриные крылышки, запечённые в соусе барбекю.",
+        "en": "Chicken wings baked in BBQ sauce."
+      },
+      "images": ["images/products/chicken-wings-1.jpg"],
+      "badges": ["hit"],
+      "variants": [
+        { "id": "s-chicken-wings-6", "size": "6 dona", "price": 36000, "weight": 300, "kcal": 690 },
+        { "id": "s-chicken-wings-12", "size": "12 dona", "price": 66000, "weight": 600, "kcal": 1380 }
+      ],
+      "addons": [
+        { "id": "add-ranch-sauce", "name": { "uz": "Ranch sousi", "ru": "Соус ранч", "en": "Ranch sauce" }, "price": 7000 },
+        { "id": "add-hot-sauce", "name": { "uz": "Achchiq sous", "ru": "Острый соус", "en": "Hot sauce" }, "price": 6000 }
+      ],
+      "removable": [
+        { "id": "rem-bbq-sauce", "name": { "uz": "Barbekyu sousi", "ru": "Соус барбекю", "en": "BBQ sauce" } },
+        { "id": "rem-sesame", "name": { "uz": "Kunjut", "ru": "Кунжут", "en": "Sesame" } }
+      ],
+      "isCombo": false,
+      "comboItems": [],
+      "order": 10,
+      "active": true
+    }
+  ]
+}

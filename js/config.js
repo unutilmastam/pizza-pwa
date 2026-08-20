@@ -1,28 +1,28 @@
 /**
  * Ilova konfiguratsiyasi va konstantalar.
  *
- * Firebase haqiqiy kalitlari deploy paytida shu faylda almashtiriladi.
  * SDK dangasa (lazy) yuklanadi: Firebase faqat birinchi marta kerak
  * bo'lganda CDN'dan import qilinadi, shuning uchun app shell tarmoqsiz
  * ham ochilaveradi.
+ *
+ * Faqat Auth va Firestore ishlatiladi. Firebase Storage YO'Q (bepul planda
+ * mavjud emas) — rasmlar GitHub Pages'dagi `images/` papkasidan beriladi.
  */
 
-/** Firebase loyiha sozlamalari — deploy oldidan to'ldiriladi. */
+/** Firebase loyiha sozlamalari. */
 export const FIREBASE_CONFIG = {
-  apiKey: 'FIREBASE_API_KEY',
-  authDomain: 'FIREBASE_PROJECT.firebaseapp.com',
-  projectId: 'FIREBASE_PROJECT',
-  storageBucket: 'FIREBASE_PROJECT.appspot.com',
-  messagingSenderId: 'FIREBASE_SENDER_ID',
-  appId: 'FIREBASE_APP_ID'
+  apiKey: 'AIzaSyDYCxZLzTTgmlECuOYGiAkifc_MCsJwxW8',
+  authDomain: 'pizza-pwa.firebaseapp.com',
+  projectId: 'pizza-pwa',
+  messagingSenderId: '621801689473',
+  appId: '1:621801689473:web:17ab4a7404dba4f1ec9880'
 };
 
-/** Firebase v10 modular SDK — CDN manzillari. */
+/** Firebase v10 modular SDK — CDN manzillari (Storage kiritilmagan). */
 export const FIREBASE_SDK = {
   app: 'https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js',
   auth: 'https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js',
-  firestore: 'https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js',
-  storage: 'https://www.gstatic.com/firebasejs/10.12.2/firebase-storage.js'
+  firestore: 'https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js'
 };
 
 /** Node servis (Render) bazaviy manzili. */

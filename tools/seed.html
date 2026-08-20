@@ -1,0 +1,198 @@
+<!DOCTYPE html>
+<html lang="uz">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="robots" content="noindex">
+  <title>Seed — menu/current ga demo menyuni yozish</title>
+  <style>
+    :root {
+      color-scheme: light dark;
+      --bg: #f6f7f9;
+      --surface: #fff;
+      --border: #e3e6ec;
+      --text: #14171c;
+      --muted: #5b6270;
+      --brand: #e2662a;
+      --ok: #2f9e5b;
+      --err: #d94141;
+    }
+    @media (prefers-color-scheme: dark) {
+      :root {
+        --bg: #0f1115;
+        --surface: #171a21;
+        --border: #272c36;
+        --text: #eef1f6;
+        --muted: #a8b0bf;
+      }
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      padding: 32px 20px 64px;
+      background: var(--bg);
+      color: var(--text);
+      font: 16px/1.5 -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    }
+    main { max-width: 720px; margin: 0 auto; }
+    h1 { font-size: 22px; margin: 0 0 4px; }
+    .sub { color: var(--muted); font-size: 14px; margin-bottom: 24px; }
+    .card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 14px;
+      padding: 20px;
+      margin-bottom: 16px;
+    }
+    .card h2 { font-size: 15px; margin: 0 0 12px; text-transform: uppercase; letter-spacing: .04em; color: var(--muted); }
+    dl { display: grid; grid-template-columns: auto 1fr; gap: 6px 16px; margin: 0; font-size: 14px; }
+    dt { color: var(--muted); }
+    dd { margin: 0; font-family: ui-monospace, SFMono-Regular, Menlo, monospace; word-break: break-all; }
+    button {
+      font: inherit;
+      font-weight: 600;
+      min-height: 46px;
+      padding: 0 22px;
+      border: 0;
+      border-radius: 10px;
+      background: var(--brand);
+      color: #fff;
+      cursor: pointer;
+    }
+    button:disabled { opacity: .5; cursor: not-allowed; }
+    .log {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 14px;
+      padding: 16px 20px;
+      font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+      font-size: 13px;
+      white-space: pre-wrap;
+      word-break: break-word;
+      min-height: 90px;
+    }
+    .log p { margin: 0 0 6px; }
+    .log .ok { color: var(--ok); }
+    .log .err { color: var(--err); font-weight: 600; }
+    .log .muted { color: var(--muted); }
+    .warn {
+      border-left: 3px solid var(--brand);
+      padding-left: 14px;
+      color: var(--muted);
+      font-size: 14px;
+    }
+    code { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; }
+  </style>
+</head>
+<body>
+<main>
+  <h1>Demo menyuni Firestore'ga yozish</h1>
+  <p class="sub">Bir martalik vosita. <code>docs/seed-menu.json</code> → <code>menu/current</code></p>
+
+  <div class="card">
+    <h2>Maqsad</h2>
+    <dl>
+      <dt>Loyiha</dt><dd id="infoProject">—</dd>
+      <dt>Hujjat</dt><dd>menu/current</dd>
+      <dt>Manba</dt><dd>../docs/seed-menu.json</dd>
+    </dl>
+  </div>
+
+  <div class="card">
+    <h2>Diqqat</h2>
+    <p class="warn">
+      Yozuv <code>menu/current</code> hujjatini <strong>butunlay almashtiradi</strong> —
+      undagi eski menyu o'chib ketadi. Faylni <code>file://</code> orqali emas,
+      mahalliy server orqali oching (masalan <code>npx http-server</code>), aks holda
+      brauzer modul va JSON so'rovini bloklaydi.
+    </p>
+  </div>
+
+  <p><button id="runBtn" type="button">Yuklash</button></p>
+
+  <div class="log" id="log" role="status" aria-live="polite"></div>
+</main>
+
+<script type="module">
+  // Firebase sozlamalari ilovaning o'z konfiguratsiyasidan olinadi —
+  // bu yerda kalitlar takrorlanmaydi.
+  import { FIREBASE_CONFIG, FIREBASE_SDK } from '../js/config.js';
+
+  const logEl = document.getElementById('log');
+  const runBtn = document.getElementById('runBtn');
+  document.getElementById('infoProject').textContent = FIREBASE_CONFIG.projectId;
+
+  /**
+   * Ekranga bitta qator yozadi.
+   * @param {string} text
+   * @param {'info'|'ok'|'err'|'muted'} [kind='info']
+   */
+  function log(text, kind = 'info') {
+    const time = new Date().toLocaleTimeString('uz-UZ', { hour12: false });
+    const line = document.createElement('p');
+    if (kind !== 'info') line.className = kind;
+    line.textContent = `${time}  ${text}`;
+    logEl.append(line);
+  }
+
+  log('Tayyor. "Yuklash" tugmasini bosing.', 'muted');
+
+  runBtn.addEventListener('click', async () => {
+    runBtn.disabled = true;
+    try {
+      // 1. Demo faylni o'qiymiz
+      log('docs/seed-menu.json o\'qilmoqda...');
+      const res = await fetch('../docs/seed-menu.json', { cache: 'no-store' });
+      if (!res.ok) throw new Error(`Fayl o'qilmadi: HTTP ${res.status}`);
+      const seed = await res.json();
+
+      const categories = Array.isArray(seed.categories) ? seed.categories.length : 0;
+      const products = Array.isArray(seed.products) ? seed.products.length : 0;
+      if (!categories || !products) throw new Error('Faylda kategoriya yoki mahsulot yo\'q');
+      log(`Topildi: version ${seed.version}, ${categories} kategoriya, ${products} mahsulot`, 'ok');
+
+      // 2. Tasdiq so'raymiz
+      const answer = window.confirm(
+        `Rostdan yozilsinmi?\n\n` +
+        `Loyiha: ${FIREBASE_CONFIG.projectId}\n` +
+        `Hujjat: menu/current\n` +
+        `Yoziladi: version ${seed.version}, ${categories} kategoriya, ${products} mahsulot\n\n` +
+        `Diqqat: hujjatning eski mazmuni butunlay almashtiriladi.`
+      );
+      if (!answer) {
+        log('Bekor qilindi — hech narsa yozilmadi.', 'muted');
+        return;
+      }
+
+      // 3. Firebase SDK (faqat app + firestore, Storage ishlatilmaydi)
+      log('Firebase SDK yuklanmoqda...');
+      const [appSdk, storeSdk] = await Promise.all([
+        import(FIREBASE_SDK.app),
+        import(FIREBASE_SDK.firestore)
+      ]);
+      const app = appSdk.initializeApp(FIREBASE_CONFIG);
+      const db = storeSdk.getFirestore(app);
+
+      // 4. Yozamiz. updatedAt fayldagi satr emas, server vaqti bo'ladi.
+      log('menu/current hujjatiga yozilmoqda...');
+      const { updatedAt, ...payload } = seed;
+      await storeSdk.setDoc(storeSdk.doc(db, 'menu', 'current'), {
+        ...payload,
+        updatedAt: storeSdk.serverTimestamp()
+      });
+
+      log(`Tayyor. menu/current yozildi (version ${seed.version}).`, 'ok');
+      log('Firestore konsolida tekshirib ko\'ring.', 'muted');
+    } catch (e) {
+      log(`Xato: ${e.message || e}`, 'err');
+      if (String(e.code || '').includes('permission-denied')) {
+        log('Security Rules yozishga ruxsat bermayapti. Vaqtincha menu uchun write ruxsatini oching yoki konsoldan qo\'lda kiriting.', 'muted');
+      }
+      console.error(e);
+    } finally {
+      runBtn.disabled = false;
+    }
+  });
+</script>
+</body>
+</html>
