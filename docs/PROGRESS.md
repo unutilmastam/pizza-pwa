@@ -49,6 +49,34 @@ Izoh:
   til uz/ru/en almashadi, SW ro'yxatdan o'tadi, konsolda xato yo'q.
   `formatPrice` → `125 000 so'm`, `pointInPolygon` va `haversine` to'g'ri.
 
+0-bosqichdan keyin qo'shilgan ishlar:
+- `js/config.js` — haqiqiy Firebase sozlamalari (`pizza-pwa`). Storage
+  ishlatilmaydi (bepul planda yo'q): SDK ro'yxatidan `firebase-storage.js`
+  va `storageBucket` olib tashlandi. Rasmlar GitHub Pages'dagi `images/`
+  papkasidan beriladi. Diqqat: `js/db.js` dagi `uploadImage()` kontrakti
+  hali Storage'ga tayanadi — 5-bosqichda boshqa yechimga o'tkaziladi.
+- `docs/seed-menu.json` — `menu/current` uchun demo ma'lumot: 3 kategoriya,
+  10 mahsulot (6 pitsa × 3 variant + 5 addon + 3 removable, 2 ichimlik,
+  2 zakuska), uz/ru/en, `version: 1`. Addon/removable nomlari ham ko'p
+  tilli obyekt — `i18n.pick()` ikkalasini ham qabul qiladi.
+- `tools/seed.html` — bir martalik vosita: JSON'ni o'qib `menu/current` ga
+  yozadi, `updatedAt` = `serverTimestamp()`, yozishdan oldin tasdiq so'raydi.
+- **Kesh xatosi va tuzatilishi.** SW `js/config.js` ni keshlagani uchun
+  brauzerda placeholder'li eski config qolib ketgan edi; noto'g'ri
+  `projectId` bilan `setDoc` xato bermay cheksiz osilib qolardi.
+  Tuzatildi: `sw.js` `VERSION = 'v2'`, `config.js` kesh ro'yxatidan
+  chiqarildi va **network-only** qilindi (`NEVER_CACHE`), `activate` da
+  boshqa versiyaning barcha keshlari hamda eski `config.js` yozuvlari
+  o'chiriladi. `tools/seed.html` configni `?nocache=` bilan o'qiydi,
+  placeholder topilsa yozuvni bloklaydi, har bosqichga timeout qo'yilgan
+  (JSON 15s, SDK 20s, yozuv 20s) va "Kesh va SW ni tozalash" tugmasi bor.
+  Tekshirildi: v1 → v2 yangilanishida eski kesh o'chdi, `config.js`
+  hech qaysi keshda qolmadi, har yuklashda tarmoqqa so'rov ketadi,
+  ilova ishlaydi va konsolda xato yo'q.
+- Ma'lum cheklov: `config.js` endi network-only, shuning uchun **oflaynda
+  ilova ochilmaydi** (app shell keshda bor, lekin config import qilinmaydi).
+  Kerak bo'lsa "avval tarmoq, uzilsa kesh" strategiyasiga o'tkazish mumkin.
+
 ---
 
 ## Bosqich 1 — menyu
