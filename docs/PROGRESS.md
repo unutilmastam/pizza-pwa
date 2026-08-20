@@ -3,12 +3,12 @@
 > Har seans boshida shu faylni o'qi. Faqat "Joriy bosqich" deb belgilangan
 > ishni bajar. Boshqa bosqichlarga o'tma. Tugagach shu faylni yangila.
 
-**Joriy bosqich: 0**
+**Joriy bosqich: 1**
 
 ---
 
 ## Bosqich 0 — asos
-Status: **boshlanmagan**
+Status: **bajarildi**
 
 Yaratiladi:
 - `index.html` — app shell: header, `main#app`, pastki nav
@@ -31,11 +31,28 @@ Kutilgan natija: sahifa ochiladi, pastki nav ishlaydi, sahifalar
 almashadi (ichi bo'sh — bu normal).
 
 Izoh:
+- Barcha rejalashtirilgan fayllar yaratildi. Qo'shimcha: `icons/icon.svg`
+  va `icons/icon-maskable.svg` (manifest uchun), ilova bootstrap kodi
+  `index.html` ichidagi module skriptda (alohida `app.js` ochilmadi —
+  SPEC'dagi fayl strukturasiga sodiq qolindi).
+- `js/config.js`: Firebase dangasa (lazy) yuklanadi — `getFirebase()`
+  faqat birinchi murojaatda CDN'dan import qiladi, shuning uchun kalitlar
+  to'ldirilmagan holatda ham app shell ochilaveradi.
+- `js/db.js` — faqat kontrakt: 22 ta funksiya nomi + JSDoc, tanasi bo'sh.
+  1–5-bosqichlarda to'ldiriladi.
+- 0-bosqichda sahifalar `index.html` da vaqtinchalik "stub" sifatida
+  ro'yxatdan o'tgan. 1-bosqichda `register('/menu', () =>
+  import('./js/pages/menu.js'))` ko'rinishiga almashtiriladi.
+- Tekshirildi (Chromium, 390×844): nav almashadi va faol bo'lim
+  yoritiladi, 404 ishlaydi, bottom-sheet ochilib Escape bilan yopiladi,
+  savat localStorage'dan tiklanadi (reload'dan keyin badge saqlanadi),
+  til uz/ru/en almashadi, SW ro'yxatdan o'tadi, konsolda xato yo'q.
+  `formatPrice` → `125 000 so'm`, `pointInPolygon` va `haversine` to'g'ri.
 
 ---
 
 ## Bosqich 1 — menyu
-Status: boshlanmagan
+Status: **joriy**
 
 `js/pages/menu.js`, `js/pages/product.js`
 - `menu/current` bitta hujjat, localStorage'ga `version` bilan keshlanadi
