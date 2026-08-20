@@ -879,7 +879,11 @@ p {
 .sheet__panel {
   position: relative;
   width: 100%;
-  max-height: 92dvh;
+  /* vh — eski iOS Safari uchun zaxira: u `dvh` ni tushunmaydi va qatorni
+     tashlab yuboradi. Chegara bo'lmasa panel kontent bo'yi cho'zilib
+     ketadi va ichki scroll umuman ishlamaydi. */
+  max-height: 90vh;
+  max-height: 90dvh;
   display: flex;
   flex-direction: column;
   padding-bottom: var(--safe-bottom);
@@ -921,15 +925,23 @@ p {
 }
 
 .sheet__body {
-  flex: 1;
+  flex: 1 1 auto;
+  /* iOS Safari: flex bolasining standart `min-height: auto` qiymati uni
+     kontentdan kichik bo'lishga qo'ymaydi — natijada `overflow-y: auto`
+     ishlamay qoladi. Nol qilinmasa ichki scroll yo'q. */
+  min-height: 0;
   overflow-y: auto;
   -webkit-overflow-scrolling: touch;
+  overscroll-behavior: contain;
   padding: var(--sp-2) var(--sp-5) var(--sp-5);
 }
 
+/* Pastki panel doim ko'rinib turadi — kontent uning ostidan suriladi */
 .sheet__footer {
   flex: 0 0 auto;
-  padding: var(--sp-3) var(--sp-5) var(--sp-5);
+  position: sticky;
+  bottom: 0;
+  padding: var(--sp-3) var(--sp-5) var(--sp-4);
   border-top: 1px solid var(--border);
   background: var(--surface);
 }
@@ -1191,10 +1203,11 @@ p {
   display: none;
 }
 
+/* Galereya balandligi qat'iy — ekranning yarmini egallab ketmasin */
 .gallery__slide {
   flex: 0 0 100%;
   scroll-snap-align: center;
-  aspect-ratio: 4 / 3;
+  height: 200px;
   background: var(--surface-2);
 }
 
@@ -1205,10 +1218,10 @@ p {
 }
 
 .gallery__ph {
-  aspect-ratio: 4 / 3;
+  height: 200px;
   display: grid;
   place-items: center;
-  font-size: 72px;
+  font-size: 56px;
   background: var(--surface-2);
   opacity: 0.5;
 }
