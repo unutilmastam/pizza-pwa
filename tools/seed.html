@@ -16,6 +16,7 @@
       --brand: #e2662a;
       --ok: #2f9e5b;
       --err: #d94141;
+      --warn: #e0a32e;
     }
     @media (prefers-color-scheme: dark) {
       :root {
@@ -48,6 +49,9 @@
     dl { display: grid; grid-template-columns: auto 1fr; gap: 6px 16px; margin: 0; font-size: 14px; }
     dt { color: var(--muted); }
     dd { margin: 0; font-family: ui-monospace, SFMono-Regular, Menlo, monospace; word-break: break-all; }
+    dd.bad { color: var(--err); font-weight: 600; }
+    dd.good { color: var(--ok); }
+    .actions { display: flex; flex-wrap: wrap; gap: 10px; margin-bottom: 16px; }
     button {
       font: inherit;
       font-weight: 600;
@@ -58,6 +62,11 @@
       background: var(--brand);
       color: #fff;
       cursor: pointer;
+    }
+    button.secondary {
+      background: transparent;
+      color: var(--text);
+      box-shadow: inset 0 0 0 1px var(--border);
     }
     button:disabled { opacity: .5; cursor: not-allowed; }
     .log {
@@ -74,12 +83,14 @@
     .log p { margin: 0 0 6px; }
     .log .ok { color: var(--ok); }
     .log .err { color: var(--err); font-weight: 600; }
+    .log .warn { color: var(--warn); }
     .log .muted { color: var(--muted); }
-    .warn {
+    .note {
       border-left: 3px solid var(--brand);
       padding-left: 14px;
       color: var(--muted);
       font-size: 14px;
+      margin: 0 0 10px;
     }
     code { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; }
   </style>
@@ -90,42 +101,63 @@
   <p class="sub">Bir martalik vosita. <code>docs/seed-menu.json</code> → <code>menu/current</code></p>
 
   <div class="card">
-    <h2>Maqsad</h2>
+    <h2>Holat</h2>
     <dl>
-      <dt>Loyiha</dt><dd id="infoProject">—</dd>
+      <dt>projectId</dt><dd id="infoProject">o'qilmoqda...</dd>
+      <dt>apiKey</dt><dd id="infoKey">—</dd>
       <dt>Hujjat</dt><dd>menu/current</dd>
       <dt>Manba</dt><dd>../docs/seed-menu.json</dd>
+      <dt>Service worker</dt><dd id="infoSw">tekshirilmoqda...</dd>
     </dl>
   </div>
 
   <div class="card">
     <h2>Diqqat</h2>
-    <p class="warn">
+    <p class="note">
       Yozuv <code>menu/current</code> hujjatini <strong>butunlay almashtiradi</strong> —
-      undagi eski menyu o'chib ketadi. Faylni <code>file://</code> orqali emas,
-      mahalliy server orqali oching (masalan <code>npx http-server</code>), aks holda
-      brauzer modul va JSON so'rovini bloklaydi.
+      undagi eski menyu o'chib ketadi.
+    </p>
+    <p class="note">
+      Agar <code>projectId</code> o'rnida <code>FIREBASE_PROJECT</code> ko'rinsa, sahifaga
+      eski <code>config.js</code> keshdan kelgan. "Kesh va SW ni tozalash" tugmasini bosing.
     </p>
   </div>
 
-  <p><button id="runBtn" type="button">Yuklash</button></p>
+  <div class="actions">
+    <button id="runBtn" type="button" disabled>Yuklash</button>
+    <button id="clearBtn" class="secondary" type="button">Kesh va SW ni tozalash</button>
+  </div>
 
   <div class="log" id="log" role="status" aria-live="polite"></div>
 </main>
 
 <script type="module">
-  // Firebase sozlamalari ilovaning o'z konfiguratsiyasidan olinadi —
-  // bu yerda kalitlar takrorlanmaydi.
-  import { FIREBASE_CONFIG, FIREBASE_SDK } from '../js/config.js';
+  /*
+   * Muhim: config.js keshdan (service worker yoki brauzer keshi) eski holida
+   * kelishi mumkin. Shuning uchun u statik `import` bilan emas, har safar
+   * yangi so'rov bo'ladigan dinamik import orqali o'qiladi.
+   */
 
   const logEl = document.getElementById('log');
   const runBtn = document.getElementById('runBtn');
-  document.getElementById('infoProject').textContent = FIREBASE_CONFIG.projectId;
+  const clearBtn = document.getElementById('clearBtn');
+
+  /** Har bir bosqich uchun kutish chegarasi (ms). */
+  const TIMEOUT = {
+    fetch: 15000,
+    sdk: 20000,
+    write: 20000
+  };
+
+  /** @type {?object} yangi o'qilgan config moduli */
+  let cfgModule = null;
+  /** Takroriy bosishda initializeApp qayta chaqirilmasin. */
+  let firestore = null;
 
   /**
    * Ekranga bitta qator yozadi.
    * @param {string} text
-   * @param {'info'|'ok'|'err'|'muted'} [kind='info']
+   * @param {'info'|'ok'|'err'|'warn'|'muted'} [kind='info']
    */
   function log(text, kind = 'info') {
     const time = new Date().toLocaleTimeString('uz-UZ', { hour12: false });
@@ -133,16 +165,140 @@
     if (kind !== 'info') line.className = kind;
     line.textContent = `${time}  ${text}`;
     logEl.append(line);
+    logEl.scrollTop = logEl.scrollHeight;
   }
 
-  log('Tayyor. "Yuklash" tugmasini bosing.', 'muted');
+  /**
+   * Va'da belgilangan vaqtda tugamasa — xato beradi.
+   * Diqqat: asosiy amal bekor qilinmaydi, faqat kutish to'xtaydi.
+   * @template T
+   * @param {Promise<T>} promise
+   * @param {number} ms
+   * @param {string} label - xabarda ko'rinadigan bosqich nomi
+   * @returns {Promise<T>}
+   */
+  function withTimeout(promise, ms, label) {
+    let timer = null;
+    const guard = new Promise((_, reject) => {
+      timer = setTimeout(
+        () => reject(new Error(`${label}: ${Math.round(ms / 1000)} soniyada javob bo'lmadi`)),
+        ms
+      );
+    });
+    return Promise.race([promise, guard]).finally(() => clearTimeout(timer));
+  }
+
+  /**
+   * Configdagi kamchilikni topadi (bo'sh yoki placeholder qiymatlar).
+   * @param {object} cfg
+   * @returns {?string} muammo tavsifi, muammo bo'lmasa null
+   */
+  function configProblem(cfg) {
+    if (!cfg || typeof cfg !== 'object') return 'FIREBASE_CONFIG eksport qilinmagan';
+    const required = ['apiKey', 'authDomain', 'projectId', 'appId'];
+    const missing = required.filter((key) => !cfg[key]);
+    if (missing.length) return `to'ldirilmagan maydonlar: ${missing.join(', ')}`;
+    const placeholders = Object.entries(cfg)
+      .filter(([, value]) => /^(FIREBASE_|YOUR_)/.test(String(value)))
+      .map(([key]) => key);
+    if (placeholders.length) {
+      return `placeholder qiymat qolgan: ${placeholders.join(', ')} — eski config.js keshdan kelgan`;
+    }
+    return null;
+  }
+
+  /** Sahifani service worker boshqarayotganini ekranga chiqaradi. */
+  function reportServiceWorker() {
+    const swEl = document.getElementById('infoSw');
+    if (!('serviceWorker' in navigator)) {
+      swEl.textContent = 'qo\'llab-quvvatlanmaydi';
+      return;
+    }
+    const controlled = Boolean(navigator.serviceWorker.controller);
+    swEl.textContent = controlled ? 'sahifani boshqarmoqda (kesh xavfi bor)' : 'yo\'q';
+    swEl.className = controlled ? 'bad' : 'good';
+    if (controlled) {
+      log('Sahifani service worker boshqarmoqda — config kesh chetlab o\'tilgan holda o\'qiladi.', 'warn');
+    }
+  }
+
+  /** Configni keshni chetlab o'tib o'qiydi va ekranga chiqaradi. */
+  async function loadConfig() {
+    const projectEl = document.getElementById('infoProject');
+    const keyEl = document.getElementById('infoKey');
+    try {
+      // Har safar yangi URL — brauzer keshi ham, SW keshi ham chetlab o'tiladi
+      cfgModule = await withTimeout(
+        import(`../js/config.js?nocache=${Date.now()}`),
+        TIMEOUT.fetch,
+        'config.js yuklanmadi'
+      );
+      const cfg = cfgModule.FIREBASE_CONFIG;
+      const problem = configProblem(cfg);
+
+      projectEl.textContent = (cfg && cfg.projectId) || '—';
+      keyEl.textContent = cfg && cfg.apiKey
+        ? `${String(cfg.apiKey).slice(0, 10)}…${String(cfg.apiKey).slice(-4)}`
+        : '—';
+
+      if (problem) {
+        projectEl.className = 'bad';
+        log(`Config yaroqsiz: ${problem}`, 'err');
+        log('"Kesh va SW ni tozalash" tugmasini bosing, so\'ng sahifani qayta yuklang.', 'muted');
+        runBtn.disabled = true;
+        return;
+      }
+
+      projectEl.className = 'good';
+      log(`Config o'qildi: ${cfg.projectId}`, 'ok');
+      log('Tayyor. "Yuklash" tugmasini bosing.', 'muted');
+      runBtn.disabled = false;
+    } catch (e) {
+      projectEl.className = 'bad';
+      projectEl.textContent = 'xato';
+      log(`config.js o'qilmadi: ${e.message || e}`, 'err');
+      runBtn.disabled = true;
+    }
+  }
+
+  /** Service worker va barcha keshlarni o'chiradi. */
+  clearBtn.addEventListener('click', async () => {
+    clearBtn.disabled = true;
+    try {
+      if ('serviceWorker' in navigator) {
+        const regs = await navigator.serviceWorker.getRegistrations();
+        await Promise.all(regs.map((r) => r.unregister()));
+        log(`Service worker o'chirildi: ${regs.length} ta`, 'ok');
+      }
+      if ('caches' in window) {
+        const keys = await caches.keys();
+        await Promise.all(keys.map((k) => caches.delete(k)));
+        log(`Kesh tozalandi: ${keys.join(', ') || 'bo\'sh'}`, 'ok');
+      }
+      log('Sahifa 2 soniyadan keyin qayta yuklanadi...', 'muted');
+      setTimeout(() => location.reload(), 2000);
+    } catch (e) {
+      log(`Tozalashda xato: ${e.message || e}`, 'err');
+      clearBtn.disabled = false;
+    }
+  });
 
   runBtn.addEventListener('click', async () => {
     runBtn.disabled = true;
     try {
+      const { FIREBASE_CONFIG, FIREBASE_SDK } = cfgModule;
+
+      // Yozishdan oldin configni yana bir bor tekshiramiz
+      const problem = configProblem(FIREBASE_CONFIG);
+      if (problem) throw new Error(`Config yaroqsiz — ${problem}`);
+
       // 1. Demo faylni o'qiymiz
       log('docs/seed-menu.json o\'qilmoqda...');
-      const res = await fetch('../docs/seed-menu.json', { cache: 'no-store' });
+      const res = await withTimeout(
+        fetch(`../docs/seed-menu.json?nocache=${Date.now()}`, { cache: 'no-store' }),
+        TIMEOUT.fetch,
+        'JSON so\'rovi'
+      );
       if (!res.ok) throw new Error(`Fayl o'qilmadi: HTTP ${res.status}`);
       const seed = await res.json();
 
@@ -165,34 +321,66 @@
       }
 
       // 3. Firebase SDK (faqat app + firestore, Storage ishlatilmaydi)
-      log('Firebase SDK yuklanmoqda...');
-      const [appSdk, storeSdk] = await Promise.all([
-        import(FIREBASE_SDK.app),
-        import(FIREBASE_SDK.firestore)
-      ]);
-      const app = appSdk.initializeApp(FIREBASE_CONFIG);
-      const db = storeSdk.getFirestore(app);
+      if (!firestore) {
+        log('Firebase SDK yuklanmoqda...');
+        const [appSdk, storeSdk] = await withTimeout(
+          Promise.all([import(FIREBASE_SDK.app), import(FIREBASE_SDK.firestore)]),
+          TIMEOUT.sdk,
+          'SDK yuklash'
+        );
+        const app = appSdk.initializeApp(FIREBASE_CONFIG);
+        firestore = { store: storeSdk, db: storeSdk.getFirestore(app) };
+        log(`SDK tayyor, loyiha: ${app.options.projectId}`, 'ok');
+      }
+      const { store, db } = firestore;
 
       // 4. Yozamiz. updatedAt fayldagi satr emas, server vaqti bo'ladi.
-      log('menu/current hujjatiga yozilmoqda...');
+      log(`menu/current hujjatiga yozilmoqda (${Math.round(TIMEOUT.write / 1000)} soniya kutamiz)...`);
       const { updatedAt, ...payload } = seed;
-      await storeSdk.setDoc(storeSdk.doc(db, 'menu', 'current'), {
-        ...payload,
-        updatedAt: storeSdk.serverTimestamp()
-      });
+      await withTimeout(
+        store.setDoc(store.doc(db, 'menu', 'current'), {
+          ...payload,
+          updatedAt: store.serverTimestamp()
+        }),
+        TIMEOUT.write,
+        'Firestore yozuvi'
+      );
 
       log(`Tayyor. menu/current yozildi (version ${seed.version}).`, 'ok');
       log('Firestore konsolida tekshirib ko\'ring.', 'muted');
     } catch (e) {
-      log(`Xato: ${e.message || e}`, 'err');
+      const code = e && e.code ? ` [${e.code}]` : '';
+      log(`Xato${code}: ${e.message || e}`, 'err');
+
+      if (String(e.message || '').includes('Firestore yozuvi')) {
+        log('Firestore tarmoq uzilganda xato bermaydi — yozuvni ichida navbatga qo\'yib, cheksiz kutadi. Sabablari:', 'muted');
+        log('  1) projectId noto\'g\'ri yoki bunday loyiha yo\'q (config keshdan kelgan)', 'muted');
+        log('  2) Firestore bazasi hali yaratilmagan — konsolda "Create database" bosing', 'muted');
+        log('  3) tarmoq yoki brauzer kengaytmasi so\'rovni bloklayapti', 'muted');
+      }
       if (String(e.code || '').includes('permission-denied')) {
         log('Security Rules yozishga ruxsat bermayapti. Vaqtincha menu uchun write ruxsatini oching yoki konsoldan qo\'lda kiriting.', 'muted');
+      }
+      if (String(e.code || '').includes('unavailable')) {
+        log('Firestore serveriga ulanib bo\'lmadi. Internet va loyiha sozlamalarini tekshiring.', 'muted');
       }
       console.error(e);
     } finally {
       runBtn.disabled = false;
     }
   });
+
+  // Hech qanday xato jim qolmasin
+  window.addEventListener('error', (e) => {
+    log(`Kutilmagan xato: ${e.message}`, 'err');
+  });
+  window.addEventListener('unhandledrejection', (e) => {
+    const reason = e.reason;
+    log(`Ushlanmagan xato: ${(reason && (reason.message || reason.code)) || reason}`, 'err');
+  });
+
+  reportServiceWorker();
+  loadConfig();
 </script>
 </body>
 </html>
