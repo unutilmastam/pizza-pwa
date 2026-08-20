@@ -1,0 +1,32 @@
+# Node
+node_modules/
+npm-debug.log*
+yarn-error.log*
+package-lock.json.bak
+
+# Muhit o'zgaruvchilari (Firebase kalitlari, Telegram token, Payme/Click)
+.env
+.env.*
+!.env.example
+serviceAccountKey.json
+firebase-adminsdk-*.json
+
+# Firebase CLI
+.firebase/
+firebase-debug.log
+firestore-debug.log
+ui-debug.log
+
+# Muharrir va OS
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
+*.swp
+
+# Build va vaqtinchalik
+dist/
+build/
+coverage/
+tmp/
+*.local

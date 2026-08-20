@@ -1,0 +1,46 @@
+{
+  "id": "/",
+  "name": "Pitsa — yetkazib berish",
+  "short_name": "Pitsa",
+  "description": "Issiq pitsa 35 daqiqada. Menyu, savat, buyurtma va yetkazib berish trekingi.",
+  "lang": "uz",
+  "dir": "ltr",
+  "start_url": "./index.html?source=pwa",
+  "scope": "./",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#0f1115",
+  "theme_color": "#0f1115",
+  "categories": ["food", "shopping", "lifestyle"],
+  "icons": [
+    {
+      "src": "./icons/icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any"
+    },
+    {
+      "src": "./icons/icon-maskable.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "maskable"
+    }
+  ],
+  "shortcuts": [
+    {
+      "name": "Menyu",
+      "short_name": "Menyu",
+      "url": "./index.html#/menu"
+    },
+    {
+      "name": "Savat",
+      "short_name": "Savat",
+      "url": "./index.html#/cart"
+    },
+    {
+      "name": "Buyurtmalarim",
+      "short_name": "Buyurtmalar",
+      "url": "./index.html#/orders"
+    }
+  ]
+}
