@@ -96,8 +96,8 @@
       ])
     });
 
-    register('/', stubPage('menu.title', '🍕'));
-    register('/menu', stubPage('menu.title', '🍕'));
+    register('/', () => import('./js/pages/menu.js'));
+    register('/menu', () => import('./js/pages/menu.js'));
     register('/cart', stubPage('cart.title', '🛒'));
     register('/orders', stubPage('order.title', '🧾'));
     register('/profile', stubPage('profile.title', '👤'));

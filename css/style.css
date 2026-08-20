@@ -1023,3 +1023,354 @@ p {
 .offline-bar[hidden] {
   display: none;
 }
+
+/* ------------------------------------------------------- 6. MENYU SAHIFASI */
+
+.menu-bar {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-2);
+  padding-top: var(--sp-2);
+  padding-bottom: var(--sp-2);
+}
+
+.menu-search .input {
+  padding-right: 42px;
+}
+
+.search__clear {
+  position: absolute;
+  right: 2px;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 38px;
+  height: 38px;
+  font-size: var(--fs-lg);
+}
+
+.search__clear[hidden] {
+  display: none;
+}
+
+.cat-bar[hidden] {
+  display: none;
+}
+
+.menu-section[hidden] {
+  display: none;
+}
+
+.menu-section .section-title {
+  margin-top: var(--sp-5);
+  scroll-margin-top: 140px;
+}
+
+/* Mahsulot kartochkasi */
+
+.prod-card {
+  display: flex;
+  flex-direction: column;
+  cursor: pointer;
+  transition: transform 0.12s var(--ease);
+}
+
+.prod-card:active {
+  transform: scale(0.98);
+}
+
+.prod-card__media {
+  aspect-ratio: 1 / 1;
+  background: var(--surface-2);
+  display: grid;
+  place-items: center;
+  overflow: hidden;
+}
+
+.prod-card__img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.prod-card__ph {
+  font-size: 46px;
+  line-height: 1;
+  opacity: 0.45;
+}
+
+.prod-card .card__body {
+  flex: 1;
+  padding: var(--sp-3);
+}
+
+.prod-card__badges {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--sp-1);
+  margin-bottom: var(--sp-1);
+}
+
+.prod-card .card__foot {
+  margin-top: auto;
+  padding-top: var(--sp-2);
+  align-items: flex-end;
+}
+
+/* Narx ikki qatorda: kichik "dan" yorlig'i va summa — o'ralib ketmasin */
+.prod-card__price {
+  display: flex;
+  flex-direction: column;
+  line-height: 1.2;
+  min-width: 0;
+}
+
+.prod-card__from {
+  font-size: 11px;
+  color: var(--text-3);
+}
+
+.prod-card .price {
+  font-size: var(--fs-sm);
+  white-space: nowrap;
+}
+
+.prod-card .card__foot .hint {
+  font-size: 11px;
+  text-align: right;
+}
+
+.prod-card__btn {
+  min-height: 34px;
+  padding: 0 var(--sp-4);
+  font-size: var(--fs-lg);
+  line-height: 1;
+}
+
+/* Nishonlar */
+
+.badge--spicy { background: rgba(217, 65, 65, 0.14); color: var(--danger); }
+.badge--new { background: rgba(47, 158, 91, 0.14); color: var(--success); }
+.badge--veg { background: rgba(47, 158, 91, 0.14); color: var(--success); }
+
+/* --------------------------------------------------- 7. MAHSULOT OYNASI */
+
+.prod-sheet {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-3);
+}
+
+.prod-sheet__title {
+  font-size: var(--fs-xl);
+}
+
+.prod-sheet__desc {
+  font-size: var(--fs-sm);
+}
+
+.prod-meta {
+  margin-top: calc(var(--sp-2) * -1);
+}
+
+/* Galereya */
+
+.gallery {
+  position: relative;
+  margin: 0 calc(var(--sp-5) * -1);
+}
+
+.gallery__track {
+  display: flex;
+  overflow-x: auto;
+  scroll-snap-type: x mandatory;
+  scrollbar-width: none;
+  -webkit-overflow-scrolling: touch;
+}
+
+.gallery__track::-webkit-scrollbar {
+  display: none;
+}
+
+.gallery__slide {
+  flex: 0 0 100%;
+  scroll-snap-align: center;
+  aspect-ratio: 4 / 3;
+  background: var(--surface-2);
+}
+
+.gallery__img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.gallery__ph {
+  aspect-ratio: 4 / 3;
+  display: grid;
+  place-items: center;
+  font-size: 72px;
+  background: var(--surface-2);
+  opacity: 0.5;
+}
+
+.gallery__dots {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: var(--sp-3);
+  display: flex;
+  justify-content: center;
+  gap: 6px;
+}
+
+.gallery__dot {
+  width: 6px;
+  height: 6px;
+  border-radius: var(--r-full);
+  background: rgba(255, 255, 255, 0.55);
+  transition: width 0.2s var(--ease), background 0.2s var(--ease);
+}
+
+.gallery__dot.is-active {
+  width: 18px;
+  background: #fff;
+}
+
+/* Tanlovlar */
+
+.opts {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-4);
+}
+
+.opt-group {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-2);
+}
+
+.seg {
+  display: flex;
+  gap: 2px;
+  padding: 3px;
+  background: var(--surface-2);
+  border-radius: var(--r-md);
+}
+
+.seg__btn {
+  flex: 1;
+  min-height: 40px;
+  border-radius: calc(var(--r-md) - 3px);
+  font-size: var(--fs-sm);
+  font-weight: 600;
+  color: var(--text-2);
+  transition: background 0.18s var(--ease), color 0.18s var(--ease);
+}
+
+.seg__btn.is-active {
+  background: var(--surface);
+  color: var(--text);
+  box-shadow: var(--shadow-1);
+}
+
+.seg__btn:disabled {
+  opacity: 0.4;
+  text-decoration: line-through;
+  pointer-events: none;
+}
+
+.opt-list {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-1);
+}
+
+.opt-row {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-3);
+  width: 100%;
+  min-height: var(--tap);
+  padding: var(--sp-2) var(--sp-3);
+  border-radius: var(--r-md);
+  background: var(--surface-2);
+  text-align: left;
+  transition: background 0.18s var(--ease);
+}
+
+.opt-row.is-active {
+  background: var(--brand-soft);
+}
+
+.opt-row__check {
+  display: grid;
+  place-items: center;
+  width: 24px;
+  height: 24px;
+  flex: 0 0 auto;
+  border-radius: var(--r-full);
+  background: var(--surface);
+  color: var(--text-2);
+  font-size: var(--fs-sm);
+  font-weight: 700;
+}
+
+.opt-row.is-active .opt-row__check {
+  background: var(--brand);
+  color: var(--brand-ink);
+}
+
+.opt-row__name {
+  flex: 1;
+  font-size: var(--fs-sm);
+}
+
+.opt-row__price {
+  font-size: var(--fs-sm);
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  color: var(--text-2);
+}
+
+.rem-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--sp-2);
+}
+
+.rem-chips .chip {
+  min-height: 38px;
+}
+
+.chip.is-removed {
+  background: rgba(217, 65, 65, 0.14);
+  color: var(--danger);
+  text-decoration: line-through;
+}
+
+/* Oyna pastki paneli */
+
+.sheet-foot {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-3);
+}
+
+.sheet-foot__main {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  gap: var(--sp-3);
+}
+
+.sheet-foot__price {
+  font-size: var(--fs-lg);
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.sheet-foot .btn {
+  flex: 1;
+}

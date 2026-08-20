@@ -49,13 +49,25 @@ const DICT = {
     'menu.nothingFound': 'Hech narsa topilmadi',
     'menu.stopList': 'Hozircha mavjud emas',
     'menu.addToCart': 'Savatga',
+    'menu.loadError': 'Menyu yuklanmadi',
+    'menu.clear': 'Tozalash',
+    'menu.results': 'Qidiruv natijalari',
+
+    'badge.hit': 'Xit',
+    'badge.new': 'Yangi',
+    'badge.spicy': 'Achchiq',
+    'badge.veg': 'Vegetarian',
 
     'product.size': 'O\'lcham',
     'product.dough': 'Xamir',
+    'product.dough.thin': 'Yupqa',
+    'product.dough.traditional': 'An\'anaviy',
     'product.addons': 'Qo\'shimchalar',
     'product.removable': 'Olib tashlash',
     'product.composition': 'Tarkibi',
     'product.kcal': 'Kaloriya',
+    'product.weight': 'Og\'irligi',
+    'product.added': 'Savatga qo\'shildi',
 
     'cart.title': 'Savat',
     'cart.empty': 'Savat bo\'sh',
@@ -130,6 +142,7 @@ const DICT = {
     'profile.theme': 'Mavzu',
     'profile.support': 'Yordam',
 
+    'unit.g': 'g',
     'unit.sum': 'so\'m',
     'unit.min': 'daq',
     'unit.cm': 'sm'
@@ -178,13 +191,25 @@ const DICT = {
     'menu.nothingFound': 'Ничего не найдено',
     'menu.stopList': 'Сейчас недоступно',
     'menu.addToCart': 'В корзину',
+    'menu.loadError': 'Меню не загрузилось',
+    'menu.clear': 'Очистить',
+    'menu.results': 'Результаты поиска',
+
+    'badge.hit': 'Хит',
+    'badge.new': 'Новинка',
+    'badge.spicy': 'Острое',
+    'badge.veg': 'Вегетарианское',
 
     'product.size': 'Размер',
     'product.dough': 'Тесто',
+    'product.dough.thin': 'Тонкое',
+    'product.dough.traditional': 'Традиционное',
     'product.addons': 'Добавки',
     'product.removable': 'Убрать',
     'product.composition': 'Состав',
     'product.kcal': 'Калории',
+    'product.weight': 'Вес',
+    'product.added': 'Добавлено в корзину',
 
     'cart.title': 'Корзина',
     'cart.empty': 'Корзина пуста',
@@ -259,6 +284,7 @@ const DICT = {
     'profile.theme': 'Тема',
     'profile.support': 'Поддержка',
 
+    'unit.g': 'г',
     'unit.sum': 'сум',
     'unit.min': 'мин',
     'unit.cm': 'см'
@@ -307,13 +333,25 @@ const DICT = {
     'menu.nothingFound': 'Nothing found',
     'menu.stopList': 'Currently unavailable',
     'menu.addToCart': 'Add to cart',
+    'menu.loadError': 'Could not load the menu',
+    'menu.clear': 'Clear',
+    'menu.results': 'Search results',
+
+    'badge.hit': 'Bestseller',
+    'badge.new': 'New',
+    'badge.spicy': 'Spicy',
+    'badge.veg': 'Vegetarian',
 
     'product.size': 'Size',
     'product.dough': 'Dough',
+    'product.dough.thin': 'Thin',
+    'product.dough.traditional': 'Traditional',
     'product.addons': 'Add-ons',
     'product.removable': 'Remove',
     'product.composition': 'Ingredients',
     'product.kcal': 'Calories',
+    'product.weight': 'Weight',
+    'product.added': 'Added to cart',
 
     'cart.title': 'Cart',
     'cart.empty': 'Your cart is empty',
@@ -388,6 +426,7 @@ const DICT = {
     'profile.theme': 'Theme',
     'profile.support': 'Support',
 
+    'unit.g': 'g',
     'unit.sum': 'UZS',
     'unit.min': 'min',
     'unit.cm': 'cm'
