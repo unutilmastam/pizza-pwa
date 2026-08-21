@@ -66,11 +66,13 @@ export async function request(path, opts = {}) {
     body = null,
     auth = false,
     timeout = SLOW_TIMEOUT,
-    onSlow = null
+    onSlow = null,
+    idempotencyKey = null
   } = opts;
 
   const headers = {};
   if (body) headers['Content-Type'] = 'application/json';
+  if (idempotencyKey) headers['Idempotency-Key'] = idempotencyKey;
 
   if (auth) {
     const token = await idToken();
@@ -130,12 +132,25 @@ export function verifyOtpRequest(phone, code) {
  * Buyurtma yaratadi. Narxni servis qayta hisoblaydi — bu yerdagi
  * summalar faqat ma'lumot uchun yuboriladi.
  *
+ * `idempotencyKey` MAJBURIY emas, lekin usiz takrorlanishdan himoya
+ * yo'q: Render uyqudan uyg'onganda so'rov client tomonda timeout
+ * bo'lishi, server tomonda esa muvaffaqiyatli tugashi mumkin. Bir xil
+ * kalit bilan kelgan ikkinchi so'rovga servis mavjud buyurtmani
+ * qaytaradi (`duplicate: true`), yangisini yaratmaydi.
+ *
  * @param {object} draft - checkout yig'gan buyurtma
- * @param {?Function} [onSlow]
- * @returns {Promise<{id: string, orderNumber: number, total: number}>}
+ * @param {{onSlow?: Function, idempotencyKey?: string}} [opts]
+ * @returns {Promise<{id: string, orderNumber: number, total: number,
+ *                    duplicate?: boolean}>}
  */
-export function createOrder(draft, onSlow = null) {
-  return request('/api/orders', { method: 'POST', body: draft, auth: true, onSlow });
+export function createOrder(draft, opts = {}) {
+  return request('/api/orders', {
+    method: 'POST',
+    body: draft,
+    auth: true,
+    onSlow: opts.onSlow || null,
+    idempotencyKey: opts.idempotencyKey || null
+  });
 }
 
 /** Uyg'otish so'rovi bir marta yuboriladi. */

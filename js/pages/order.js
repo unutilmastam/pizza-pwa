@@ -6,7 +6,7 @@
  * Kafolat taymeri har soniyada sanaydi.
  */
 
-import { t } from '../i18n.js';
+import { t, pick } from '../i18n.js';
 import { el, emptyState, skeleton, toast, bottomSheet, confirm as confirmDialog, loader } from '../ui.js';
 import { formatPrice, formatDate, formatCountdown, formatPhone, toDate, haptic } from '../utils.js';
 import { APP, DEFAULT_CENTER } from '../config.js';
@@ -83,7 +83,9 @@ function orderCard(order) {
     ]),
     el('p.hint', { text: formatDate(order.createdAt) }),
     el('p.order-card__items', {
-      text: (order.items || []).map((i) => `${i.name} × ${i.qty}`).join(', ')
+      // Servis nomni `{uz,ru,en}` obyekt qilib saqlaydi — `pick()` ikkala
+      // shaklni ham tushunadi (eski buyurtmalarda oddiy satr bo'lishi mumkin)
+      text: (order.items || []).map((i) => `${pick(i.name)} × ${i.qty}`).join(', ')
     }),
     el('div.row.row--between.order-card__foot', {}, [
       el('span.price', { text: formatPrice(order.total) }),
@@ -109,13 +111,16 @@ function repeatOrder(order) {
   const items = order.items || [];
   if (!items.length) return;
   items.forEach((item) => {
+    // Savat elementida nom har doim SATR (`product.js` shunday yasaydi),
+    // buyurtmada esa `{uz,ru,en}` obyekt bo'lishi mumkin — shu yerda
+    // joriy tilga keltiriladi.
     addToCart({
       productId: item.productId,
       variantId: item.variantId,
-      name: item.name,
+      name: pick(item.name),
       size: item.size,
       dough: item.dough,
-      addons: item.addons || [],
+      addons: (item.addons || []).map((a) => ({ ...a, name: pick(a.name) })),
       removed: item.removed || [],
       qty: item.qty,
       unitPrice: item.unitPrice,
@@ -472,7 +477,7 @@ function renderTracking(body, orderId) {
     const items = el('div.sums');
     (order.items || []).forEach((item) => {
       items.append(el('div.sum-row', {}, [
-        el('span', { text: `${item.name} × ${item.qty}` }),
+        el('span', { text: `${pick(item.name)} × ${item.qty}` }),
         el('span', { text: formatPrice(item.total ?? item.unitPrice * item.qty) })
       ]));
     });

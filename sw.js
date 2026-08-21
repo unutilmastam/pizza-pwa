@@ -11,7 +11,7 @@
  * Statik fayl mazmuni o'zgarsa — VERSION ni oshiring.
  */
 
-const VERSION = 'v8';
+const VERSION = 'v9';
 const SHELL_CACHE = `pizza-shell-${VERSION}`;
 const RUNTIME_CACHE = `pizza-runtime-${VERSION}`;
 

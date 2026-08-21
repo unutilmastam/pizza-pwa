@@ -117,12 +117,18 @@ app.post('/api/orders', requireAuth, rateLimit({ windowMs: 60000, max: 10 }), wr
   if (!payload || typeof payload !== 'object') {
     throw httpError(400, 'bad-body', 'So\'rov tanasi noto\'g\'ri');
   }
+  // Idempotency kaliti: sarlavhada yoki tanada. Render uyqudan
+  // uyg'onganda birinchi so'rov client tomonda timeout bo'lishi mumkin,
+  // lekin server uni bajarib bo'ladi — shu kalit takroriy bosishda
+  // ikkinchi buyurtma yaratilishiga yo'l qo'ymaydi.
   const order = await createOrder({
     uid: req.user.uid,
     phone: req.user.phone,
-    payload
+    payload,
+    idempotencyKey: req.headers['idempotency-key'] || payload.idempotencyKey
   });
-  res.status(201).json(order);
+  // Takrori bo'lsa 200: yangi resurs yaratilmadi
+  res.status(order.duplicate ? 200 : 201).json(order);
 }));
 
 // Statusni faqat admin o'zgartiradi (kuryer paneli keyingi bosqichda)

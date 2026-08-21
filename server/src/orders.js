@@ -11,6 +11,7 @@
  * ishlamaydi. Payme/Click integratsiyasi keyingi bosqichga qoldirilgan.
  */
 
+import { createHash } from 'node:crypto';
 import { config } from './config.js';
 import { getDb, getFieldTypes } from './firebase.js';
 import { findZone } from './geo.js';
@@ -28,6 +29,105 @@ export const STATUSES = [
 /** Bitta buyurtmadagi eng ko'p element soni — nojo'ya so'rovlardan himoya. */
 const MAX_ITEMS = 50;
 const MAX_QTY = 30;
+
+/**
+ * Idempotency kaliti bo'yicha "band" yozuv necha vaqt tirik hisoblanadi.
+ * Birinchi so'rov shu vaqt ichida tugamasa, kalit bo'shatiladi.
+ */
+const IDEMPOTENCY_STALE_MS = 120000;
+
+/** Takroriy so'rov birinchisini kutish vaqti va tekshiruv oralig'i. */
+const IDEMPOTENCY_WAIT_MS = 20000;
+const IDEMPOTENCY_POLL_MS = 500;
+
+/**
+ * Kalitdan Firestore hujjat ID yasaydi.
+ * Kalit foydalanuvchi yuborgan matn — hujjat ID sifatida to'g'ridan-to'g'ri
+ * ishlatib bo'lmaydi (`/` va uzunlik cheklovi), shuning uchun xeshlanadi.
+ * uid ham aralashtiriladi: bir foydalanuvchining kaliti boshqasinikiga
+ * ta'sir qilmasin.
+ *
+ * @param {string} uid
+ * @param {string} key
+ * @returns {string}
+ */
+function idempotencyDocId(uid, key) {
+  return createHash('sha256').update(`${uid}:${key}`).digest('hex');
+}
+
+/**
+ * Kutadi.
+ * @param {number} ms
+ * @returns {Promise<void>}
+ */
+function sleep(ms) {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+/**
+ * Idempotency kalitini band qiladi.
+ *
+ * Render bepul planida servis uyqudan uyg'onganda birinchi so'rov
+ * client tomonda timeout bo'lishi mumkin, lekin SERVER uni baribir
+ * oxirigacha bajaradi. Foydalanuvchi qayta bosganda ayni o'sha kalit
+ * keladi va bu funksiya yangi buyurtma yaratishga yo'l qo'ymaydi.
+ *
+ * `create()` atomik: hujjat bor bo'lsa xato beradi, shuning uchun ikki
+ * so'rov bir vaqtda kelsa ham faqat bittasi "egasi" bo'ladi.
+ *
+ * @param {import('firebase-admin/firestore').Firestore} db
+ * @param {string} uid
+ * @param {string} key
+ * @returns {Promise<{owner: boolean, ref: object, orderId?: string,
+ *                    orderNumber?: number, total?: number}>}
+ *
+ * Eksport qilingan: `server/test/idempotency.test.js` uni xotiradagi
+ * soxta Firestore bilan sinaydi.
+ */
+export async function claimIdempotency(db, uid, key) {
+  const { Timestamp } = await getFieldTypes();
+  const ref = db.collection('idempotency').doc(idempotencyDocId(uid, key));
+
+  try {
+    await ref.create({ uid, status: 'pending', createdAt: Timestamp.now() });
+    return { owner: true, ref };
+  } catch (e) {
+    if (e.code !== 6 && e.code !== 'already-exists') throw e;
+  }
+
+  // Kalit band — birinchi so'rov tugashini kutamiz
+  const deadline = Date.now() + IDEMPOTENCY_WAIT_MS;
+  for (;;) {
+    const snap = await ref.get();
+    const data = snap.exists ? snap.data() : null;
+
+    if (!data) {
+      // Yozuv o'chirilgan (birinchi so'rov xato bilan tugagan) — qayta urinamiz
+      return claimIdempotency(db, uid, key);
+    }
+    if (data.orderId) {
+      return {
+        owner: false,
+        ref,
+        orderId: data.orderId,
+        orderNumber: data.orderNumber,
+        total: data.total
+      };
+    }
+
+    // Birinchi so'rov osilib qolgan bo'lsa (process qayta ishga tushgan
+    // va `finally` bajarilmagan) — kalitni bo'shatamiz
+    const age = Date.now() - (data.createdAt?.toMillis?.() ?? 0);
+    if (age > IDEMPOTENCY_STALE_MS) {
+      await ref.delete().catch(() => {});
+      return claimIdempotency(db, uid, key);
+    }
+    if (Date.now() > deadline) {
+      throw httpError(409, 'order-in-progress', 'Buyurtma yaratilmoqda, biroz kuting');
+    }
+    await sleep(IDEMPOTENCY_POLL_MS);
+  }
+}
 
 /**
  * `settings/global` — bo'lmasa env qiymatlari ishlatiladi.
@@ -296,12 +396,62 @@ async function nextOrderNumber(db) {
 }
 
 /**
- * Buyurtma yaratadi.
+ * Buyurtma yaratadi — idempotency kaliti bilan himoyalangan.
+ *
+ * Kalit berilsa, AYNI o'sha kalit bilan kelgan ikkinchi so'rov yangi
+ * buyurtma yaratmaydi: birinchisining natijasi qaytariladi (`duplicate:
+ * true`). Kalitsiz so'rov ham qabul qilinadi, lekin unda takrorlanishdan
+ * himoya yo'q.
+ *
+ * @param {{uid: string, phone: string, payload: object,
+ *          idempotencyKey?: string}} input
+ * @returns {Promise<{id: string, orderNumber: number, total: number,
+ *                    duplicate?: boolean}>}
+ */
+export async function createOrder({ uid, phone, payload, idempotencyKey }) {
+  const key = String(idempotencyKey || '').trim().slice(0, 128);
+  if (!key) return createOrderOnce({ uid, phone, payload });
+
+  const db = await getDb();
+  const { Timestamp } = await getFieldTypes();
+  const claim = await claimIdempotency(db, uid, key);
+
+  // Kalit allaqachon ishlatilgan — o'sha buyurtmani qaytaramiz
+  if (!claim.owner) {
+    console.log(`[orders] takroriy so'rov, mavjud buyurtma qaytarildi: ${claim.orderId}`);
+    return {
+      id: claim.orderId,
+      orderNumber: claim.orderNumber,
+      total: claim.total,
+      duplicate: true
+    };
+  }
+
+  try {
+    const order = await createOrderOnce({ uid, phone, payload });
+    await claim.ref.set({
+      status: 'done',
+      orderId: order.id,
+      orderNumber: order.orderNumber,
+      total: order.total,
+      doneAt: Timestamp.now()
+    }, { merge: true });
+    return order;
+  } catch (e) {
+    // Buyurtma yaratilmadi — kalit bo'shatiladi, foydalanuvchi xatoni
+    // tuzatib qayta yuborishi mumkin
+    await claim.ref.delete().catch(() => {});
+    throw e;
+  }
+}
+
+/**
+ * Buyurtmani haqiqatda yaratadi (idempotency tekshiruvisiz).
  *
  * @param {{uid: string, phone: string, payload: object}} input
  * @returns {Promise<{id: string, orderNumber: number, total: number}>}
  */
-export async function createOrder({ uid, phone, payload }) {
+async function createOrderOnce({ uid, phone, payload }) {
   const db = await getDb();
   const { FieldValue, Timestamp } = await getFieldTypes();
 

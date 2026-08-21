@@ -338,14 +338,26 @@ export function render() {
       if (!fresh) return;
       const known = getState().user;
       if (!known) return;
-      if (known.bonusBalance !== fresh.bonusBalance || known.tier !== fresh.tier
-        || known.name !== fresh.name) {
-        updateUser({
-          name: fresh.name || '',
-          birthday: fresh.birthday || '',
-          bonusBalance: fresh.bonusBalance || 0,
-          tier: fresh.tier || 'bronze'
-        });
+
+      // DIQQAT: ikkala tomon ham BIR XIL normallashtirilishi shart.
+      // Aks holda holatdagi `name: ''` va hujjatdagi `name: undefined`
+      // doim "farq qildi" deb hisoblanadi — `rebuild()` → `refreshProfile()`
+      // → `rebuild()` cheksiz aylanadi va sahifa skeletonda qotib qoladi.
+      // Servis yaratgan hujjatda faqat `phone` bo'ladi, shuning uchun bu
+      // holat har bir yangi foydalanuvchida yuz beradi.
+      const next = {
+        name: fresh.name || '',
+        birthday: fresh.birthday || '',
+        bonusBalance: fresh.bonusBalance || 0,
+        tier: fresh.tier || 'bronze'
+      };
+      const changed = (known.name || '') !== next.name ||
+        (known.birthday || '') !== next.birthday ||
+        (known.bonusBalance || 0) !== next.bonusBalance ||
+        (known.tier || 'bronze') !== next.tier;
+
+      if (changed) {
+        updateUser(next);
         rebuild();
       }
     } catch (e) {
