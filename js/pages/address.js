@@ -16,7 +16,8 @@ import { t } from '../i18n.js';
 import { el, toast, confirm as confirmDialog, loader } from '../ui.js';
 import { debounce, pointInPolygon, formatPrice, uid } from '../utils.js';
 import {
-  YANDEX_MAPS_KEY, YANDEX_MAPS_VERSION, YANDEX_MAPS_LANG, DEFAULT_CENTER, APP
+  YANDEX_MAPS_KEY, YANDEX_MAPS_VERSION, YANDEX_MAPS_LANG, DEFAULT_CENTER,
+  NOMINATIM, APP
 } from '../config.js';
 import { getBranches, getAddresses, addAddress, updateAddress, deleteAddress } from '../db.js';
 import {
@@ -27,6 +28,9 @@ import { back } from '../router.js';
 
 /** Xarita skripti necha ms kutiladi. */
 const MAP_TIMEOUT = 12000;
+
+/** Nominatim `accept-language` qiymatlari — u o'zbek tilini biladi. */
+const NOMINATIM_LANG = { uz: 'uz', ru: 'ru', en: 'en' };
 
 /** @type {?Promise<object>} skript bir marta yuklanadi va keshlanadi */
 let ymapsPromise = null;
@@ -213,12 +217,14 @@ export function render() {
   });
 
   /**
-   * Ekrandagi ogohlantirishni ko'rsatadi yoki yashiradi.
+   * Ekrandagi xabarni ko'rsatadi yoki yashiradi.
    * @param {?string} text - bo'sh bo'lsa yashiriladi
+   * @param {'warn'|'info'} [kind='warn'] - `info` neytral (masalan atributsiya)
    */
-  function showNotice(text) {
+  function showNotice(text, kind = 'warn') {
     notice.textContent = text || '';
     notice.hidden = !text;
+    notice.classList.toggle('map-notice--info', Boolean(text) && kind === 'info');
   }
 
   const zoneBox = el('div.zone-info');
@@ -501,6 +507,72 @@ function coordsLabel(lat, lng) {
   return `${Number(lat).toFixed(5)}, ${Number(lng).toFixed(5)}`;
 }
 
+/** Nominatim'ga oxirgi so'rov vaqti — sekundiga 1 tadan oshmasligi uchun. */
+let lastNominatimAt = 0;
+
+/**
+ * Nominatim javobidan qisqa manzil qatorini yig'adi.
+ * `display_name` juda uzun ("12, Amir Temur ko'chasi, Toshkent, 100000,
+ * O'zbekiston"), shuning uchun avval ko'cha + uy raqami olinadi.
+ *
+ * @param {object} data - Nominatim JSON javobi
+ * @returns {string}
+ */
+export function formatNominatim(data) {
+  if (!data || typeof data !== 'object') return '';
+  const a = data.address || {};
+  const street = a.road || a.pedestrian || a.residential || a.neighbourhood || a.suburb || '';
+  const house = a.house_number || '';
+  const city = a.city || a.town || a.village || a.county || '';
+  const line = [[street, house].filter(Boolean).join(' '), city].filter(Boolean).join(', ');
+  return line || data.display_name || '';
+}
+
+/**
+ * OSM Nominatim orqali teskari geokodlash (zaxira geokoder).
+ *
+ * Brauzerdan `User-Agent` yuborib bo'lmaydi (taqiqlangan sarlavha) —
+ * so'rovni brauzer o'zi qo'shadigan `Referer` tanitadi.
+ *
+ * @param {number} lat
+ * @param {number} lng
+ * @param {string} lang - `accept-language` qiymati
+ * @returns {Promise<string>} manzil qatori (topilmasa bo'sh satr)
+ */
+export async function nominatimReverse(lat, lng, lang) {
+  // Sekundiga 1 so'rov cheklovi
+  const wait = NOMINATIM.minInterval - (Date.now() - lastNominatimAt);
+  if (wait > 0) await new Promise((resolve) => setTimeout(resolve, wait));
+  lastNominatimAt = Date.now();
+
+  const params = new URLSearchParams({
+    format: 'json',
+    lat: String(lat),
+    lon: String(lng),
+    zoom: '18',
+    'accept-language': lang
+  });
+  const url = `${NOMINATIM.url}?${params.toString()}`;
+  console.log('[geocode] Nominatim so\'rovi:', url);
+
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), NOMINATIM.timeout);
+  try {
+    const res = await fetch(url, {
+      signal: controller.signal,
+      headers: { Accept: 'application/json' },
+      referrerPolicy: 'strict-origin-when-cross-origin'
+    });
+    if (!res.ok) throw new Error(`Nominatim HTTP ${res.status}`);
+    const data = await res.json();
+    const line = formatNominatim(data);
+    console.log('[geocode] Nominatim javobi:', JSON.stringify(line), data);
+    return line;
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
 /**
  * Xaritani yuklaydi va ishga tushiradi. Xato bo'lsa qo'lda kiritish rejimi.
  * @param {{mapBox: HTMLElement, searchInput: HTMLElement, picked: object,
@@ -549,37 +621,58 @@ async function initMap(ctx) {
      * @param {[number, number]} coords
      */
     const reverse = debounce(async (coords) => {
+      const [lat, lng] = coords;
+      let line = '';
+      let provider = null;
+      /** Yandex nima deganini eslab qolamiz — hech nima chiqmasa shu ko'rsatiladi. */
+      let yandexProblem = null;
+
+      // 1-urinish: Yandex geokoderi
       if (geocoderBlocked) {
-        // Kalitda geokoder yo'q — koordinatani ko'rsatamiz, qo'lda yoziladi
-        setPoint(coords[0], coords[1], coordsLabel(coords[0], coords[1]));
+        console.log('[geocode] Yandex geokoderi o\'tkazib yuborildi (403 bo\'lgan)');
+      } else {
+        console.log('[geocode] Yandex chaqiruvi:', coords);
+        try {
+          const res = await ymaps.geocode(coords, { results: 1 });
+          const first = firstGeoObject(res);
+          line = first && typeof first.getAddressLine === 'function'
+            ? first.getAddressLine()
+            : '';
+          console.log('[geocode] Yandex manzil qatori:', JSON.stringify(line));
+          if (line) provider = 'yandex';
+          else yandexProblem = t('address.notFound');
+        } catch (e) {
+          const info = describeGeocodeError(e);
+          console.error('[geocode] Yandex XATO:', info.code, e);
+          if (info.code === 'forbidden') geocoderBlocked = true;
+          yandexProblem = info.message;
+        }
+      }
+
+      // 2-urinish: OpenStreetMap Nominatim
+      if (!line) {
+        try {
+          line = await nominatimReverse(lat, lng, NOMINATIM_LANG[getLang()] || 'uz');
+          if (line) provider = 'osm';
+        } catch (e) {
+          console.error('[geocode] Nominatim XATO:', e && e.name === 'AbortError'
+            ? `vaqt tugadi (${NOMINATIM.timeout} ms)`
+            : e);
+        }
+      }
+
+      console.log('[geocode] ishlagan geokoder:', provider || 'hech qaysi');
+
+      // 3-holat: ikkalasi ham bermadi — koordinata qoladi, qo'lda yoziladi
+      if (!line) {
+        showNotice(yandexProblem || t('address.geocodeError'));
+        setPoint(lat, lng, coordsLabel(lat, lng));
         return;
       }
 
-      console.log('[geocode] chaqiruv:', coords);
-      try {
-        const res = await ymaps.geocode(coords, { results: 1 });
-        const first = firstGeoObject(res);
-        const line = first && typeof first.getAddressLine === 'function'
-          ? first.getAddressLine()
-          : '';
-        console.log('[geocode] manzil qatori:', JSON.stringify(line));
-
-        if (line) {
-          showNotice(null);
-          setPoint(coords[0], coords[1], line);
-        } else {
-          // Javob bor, lekin manzil yo'q (masalan, dala o'rtasi)
-          showNotice(t('address.notFound'));
-          setPoint(coords[0], coords[1], coordsLabel(coords[0], coords[1]));
-        }
-      } catch (e) {
-        const info = describeGeocodeError(e);
-        console.error('[geocode] XATO:', info.code, e);
-        if (info.code === 'forbidden') geocoderBlocked = true;
-        showNotice(info.message);
-        setPoint(coords[0], coords[1], coordsLabel(coords[0], coords[1]));
-      }
-    }, 400);
+      showNotice(provider === 'osm' ? t('address.viaOsm') : null, 'info');
+      setPoint(lat, lng, line);
+    }, NOMINATIM.minInterval);
 
     /**
      * Marker yangi nuqtaga qo'yilganda: zona darhol yangilanadi,

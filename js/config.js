@@ -45,6 +45,23 @@ export const YANDEX_MAPS_LANG = { uz: 'ru_RU', ru: 'ru_RU', en: 'en_US' };
 /** Toshkent markazi — xarita boshlang'ich nuqtasi. */
 export const DEFAULT_CENTER = [41.311081, 69.240562];
 
+/**
+ * OpenStreetMap Nominatim — zaxira geokoder.
+ * Yandex geokoderi ishlamaganda yoki bo'sh natija qaytarganda ishlatiladi.
+ *
+ * Foydalanish qoidalari (operations.osmfoundation.org/policies/nominatim):
+ *  - sekundiga 1 tadan ko'p so'rov yubormaslik → `minInterval`;
+ *  - so'rovni tanitish (User-Agent yoki Referer). Brauzerdan `User-Agent`
+ *    ni o'zgartirib bo'lmaydi — u taqiqlangan sarlavha, shuning uchun
+ *    brauzer o'zi yuboradigan `Referer` ishlatiladi;
+ *  - natijada atributsiya ko'rsatilishi shart → "© OpenStreetMap".
+ */
+export const NOMINATIM = {
+  url: 'https://nominatim.openstreetmap.org/reverse',
+  timeout: 8000,
+  minInterval: 1200
+};
+
 /** Ilova konstantalari. */
 export const APP = {
   version: '0.1.0',

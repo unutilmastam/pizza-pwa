@@ -242,6 +242,16 @@ Izoh:
   bu ham tuzatildi). 403 dan keyin qayta urinilmaydi. `firstGeoObject()`
   javob shakliga bog'liq emas: `getLength()` bo'lmasa ham ishlaydi.
   Zona tekshiruvi geokoderga bog'liq emas — koordinatadan hisoblanadi.
+- **Zaxira geokoder — OSM Nominatim.** Tartib: 1) `ymaps.geocode()`,
+  2) muvaffaqiyatsiz yoki bo'sh natijada `nominatim.openstreetmap.org/
+  reverse`, 3) u ham bermasa koordinata qoladi va qo'lda yozish taklif
+  qilinadi. Konsolda qaysi geokoder ishlagani yoziladi
+  (`[geocode] ishlagan geokoder: yandex|osm|hech qaysi`).
+  Nominatim qoidalari: debounce 1200 ms + so'rovlar orasida minimal
+  1200 ms interval, `accept-language` interfeys tiliga qarab (u o'zbek
+  tilini biladi), natija ostida "© OpenStreetMap" atributsiyasi.
+  Brauzerdan `User-Agent` yuborib bo'lmaydi (taqiqlangan sarlavha) —
+  so'rovni brauzer qo'shadigan `Referer` tanitadi.
 - Bu bosqichda qilinmadi: joylashuvni avtomatik aniqlash tugmasi
   (`geolocationControl` xaritaning o'zida bor), manzilni xarita ustida
   ko'rsatuvchi doimiy pin animatsiyasi, filiallarni masofa bo'yicha
