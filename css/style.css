@@ -1821,3 +1821,75 @@ body:has(.cart-cta) .toasts {
   flex-direction: column;
   gap: 2px;
 }
+
+/* ------------------------------------------------------ 10. KIRISH (AUTH) */
+
+.auth-body {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-3);
+}
+
+.auth-lead {
+  font-size: var(--fs-sm);
+}
+
+.phone-input {
+  font-size: var(--fs-lg);
+  font-variant-numeric: tabular-nums;
+  letter-spacing: 0.02em;
+}
+
+/* OTP kataklari */
+
+.otp {
+  display: flex;
+  gap: var(--sp-2);
+  justify-content: space-between;
+}
+
+.otp__box {
+  flex: 1;
+  min-width: 0;
+  height: 56px;
+  padding: 0;
+  border: 1px solid var(--border);
+  border-radius: var(--r-md);
+  background: var(--surface);
+  color: var(--text);
+  font-size: var(--fs-xl);
+  font-weight: 700;
+  text-align: center;
+  font-variant-numeric: tabular-nums;
+  transition: border-color 0.18s var(--ease), box-shadow 0.18s var(--ease);
+}
+
+.otp__box:focus {
+  outline: none;
+  border-color: var(--brand);
+  box-shadow: 0 0 0 3px var(--brand-soft);
+}
+
+/* Test rejimi plashkasi */
+
+.test-banner {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: var(--sp-3) var(--sp-4);
+  border-radius: var(--r-md);
+  background: rgba(224, 163, 46, 0.16);
+  border-left: 3px solid var(--warning);
+  font-size: var(--fs-sm);
+}
+
+.auth-card {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-1);
+}
+
+.auth-phone {
+  font-size: var(--fs-xl);
+  font-variant-numeric: tabular-nums;
+}

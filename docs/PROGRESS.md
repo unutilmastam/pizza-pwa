@@ -3,7 +3,7 @@
 > Har seans boshida shu faylni o'qi. Faqat "Joriy bosqich" deb belgilangan
 > ishni bajar. Boshqa bosqichlarga o'tma. Tugagach shu faylni yangila.
 
-**Joriy bosqich: 4**
+**Joriy bosqich: 5**
 
 ---
 
@@ -270,7 +270,7 @@ Izoh:
 ---
 
 ## Bosqich 4 — auth
-Status: **joriy**
+Status: **bajarildi (test rejimida)**
 
 `js/pages/auth.js`, `js/auth.js`
 - +998 mask, OTP 6 katak, 60 sek taymer
@@ -279,11 +279,57 @@ Status: **joriy**
 - Mehmon rejimi
 
 Izoh:
+- **DIQQAT: auth hozircha TEST REJIMIDA.** Node servis 6-bosqichda
+  yoziladi, shungacha SMS yuborilmaydi. `config.js` da
+  `AUTH_MODE = 'test'` — 6-bosqichda `'production'` ga o'zgartirilsa
+  `js/auth.js` o'zi `/api/auth/send-otp` va `/verify-otp` ga o'tadi,
+  boshqa hech narsani tahrirlash shart emas.
+- Test rejimi qanday ishlaydi: telefon kiritiladi → kod so'raladi (hech
+  qayerga so'rov ketmaydi) → `000000` qabul qilinadi →
+  `signInAnonymously()` bilan haqiqiy Firebase sessiya ochiladi →
+  `users/{uid}` hujjati yaratiladi va unga telefon yoziladi. Ekranda
+  ochiq yozilgan: "Test rejimi — kod: 000000".
+- `js/auth.js` — yagona auth qatlami: `sendOtp`, `verifyOtp`, `logout`,
+  `watchAuth`, `initAuth`, `normalizePhone`, `authErrorKey`. Ikkala
+  rejim ham shu yerda, sahifalar Firebase Auth'ni bevosita chaqirmaydi.
+- `js/pages/auth.js` — ikki qadam: +998 maskali telefon va 6 katakli OTP
+  (raqamlar orasida avtomatik o'tish, Backspace orqaga qaytaradi, to'liq
+  kodni paste qilsa kataklarga tarqaladi), 60 soniyalik qayta yuborish
+  taymeri, "Raqamni o'zgartirish", mehmon rejimi. Kirgan holatda sessiya
+  kartochkasi va "Chiqish".
+- `db.ensureUserDoc()` faqat XAVFSIZ maydonlarni yozadi (phone, name,
+  lang, createdAt/lastLoginAt). `bonusBalance`, `tier`, `totalSpent`,
+  `blocked` — Security Rules bo'yicha client tegmaydi, ularni Node
+  servis boshqaradi. `getUser()` va `updateUserProfile()` ham yozildi.
+- **Firebase FAQAT kerak bo'lganda yuklanadi**: `initAuth()` kuzatuvchini
+  ilgari kirgan foydalanuvchi uchungina ulaydi, mehmon uchun bosh sahifa
+  ortiqcha so'rovsiz ochiladi (test bilan tasdiqlangan).
+- SPEC 55 bajarildi: checkout'da "Buyurtma berish" bosilganda mehmon
+  `#/auth?next=/checkout` ga yo'naltiriladi va kirgach o'sha yerga
+  qaytadi. Savat va manzil mehmon rejimida ham ishlayveradi.
+- Profil sahifasi hamon 5-bosqichniki, lekin unga kirish/chiqish tugmasi
+  qo'yildi — aks holda auth sahifasiga borish yo'li bo'lmasdi.
+- **Firebase konsolida Anonymous kirish yoqilgan bo'lishi shart**
+  (Authentication → Sign-in method → Anonymous). Yoqilmagan bo'lsa
+  ekranda aniq xabar chiqadi: "Firebase konsolida Anonymous kirish
+  yoqilmagan".
+- Ma'lum cheklov: mehmon rejimida saqlangan manzillar localStorage'da
+  qoladi, kirgandan keyin ular Firestore'ga ko'chirilmaydi. Kerak bo'lsa
+  5-bosqichda migratsiya qo'shiladi.
+- `sw.js` `VERSION = 'v6'`, `auth.js` va `pages/auth.js` app shell'da.
+- Tekshirildi (Chromium 390×844, soxta Firebase auth bilan) — 10 ta
+  stsenariy: mehmon uchun auth so'rovi yo'q; test plashkasi ko'rinadi;
+  maska `901234567` → `+998 90 123 45 67`; 6 katak va 60 sek taymer;
+  noto'g'ri kod → "Kod noto'g'ri" va kataklar tozalanadi; `000000` →
+  sessiya ochildi, `state.user` to'ldi, `users/{uid}` ga telefon yozildi;
+  profil kirgan raqamni ko'rsatadi; chiqish `user`ni null qiladi;
+  mehmon rejimi ishlaydi; checkout `#/auth?next=/checkout` ga yubordi va
+  kirgach qaytardi; Anonymous o'chirilgan holatda aniq xabar chiqdi.
 
 ---
 
 ## Bosqich 5 — treking va profil
-Status: boshlanmagan
+Status: **joriy**
 
 `js/pages/order.js`, `js/pages/profile.js`
 - `onSnapshot` real-time, 7 status stepper, kafolat taymeri
