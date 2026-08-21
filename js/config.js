@@ -47,6 +47,27 @@ export const APP = {
   searchDebounce: 300,
   /** Toast ko'rinish vaqti (ms). */
   toastDuration: 2600,
+  /**
+   * Yetkazib berish qiymatlari — VAQTINCHALIK zaxira.
+   * 3-bosqichda bular filialning zona ma'lumotidan olinadi
+   * (`branches/{id}.zones[].deliveryPrice / minOrder`), zona topilmaguncha
+   * shu qiymatlar ishlatiladi.
+   */
+  delivery: {
+    price: 15000,
+    minOrder: 50000,
+    /** Shu summadan boshlab yetkazish bepul. */
+    freeFrom: 150000,
+    /** Eng erta yetkazish vaqti (daqiqa) — vaqt tanlashda tekshiriladi. */
+    minLeadMinutes: 30
+  },
+
+  /** To'lov usullari — 6-bosqichda Payme/Click/Uzum redirect qo'shiladi. */
+  paymentMethods: ['cash', 'card', 'payme', 'click', 'uzum'],
+
+  /** Idish-tovoq soni chegarasi. */
+  maxCutlery: 10,
+
   /** Buyurtma statuslari — ketma-ketlik stepper uchun muhim. */
   orderStatuses: [
     'new',

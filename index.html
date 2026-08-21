@@ -98,7 +98,8 @@
 
     register('/', () => import('./js/pages/menu.js'));
     register('/menu', () => import('./js/pages/menu.js'));
-    register('/cart', stubPage('cart.title', '🛒'));
+    register('/cart', () => import('./js/pages/cart.js'));
+    register('/checkout', () => import('./js/pages/checkout.js'));
     register('/orders', stubPage('order.title', '🧾'));
     register('/profile', stubPage('profile.title', '👤'));
     registerNotFound(() => ({

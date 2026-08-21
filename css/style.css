@@ -751,6 +751,12 @@ p {
   pointer-events: none;
 }
 
+/* Sahifada sticky asosiy tugma bo'lsa (savat, checkout) toast uni to'smasin.
+   `:has()` ni tanimaydigan eski brauzerda toast avvalgi joyida qoladi. */
+body:has(.cart-cta) .toasts {
+  bottom: calc(var(--nav-h) + var(--safe-bottom) + 72px);
+}
+
 .toast {
   display: flex;
   align-items: center;
@@ -1386,4 +1392,313 @@ p {
 
 .sheet-foot .btn {
   flex: 1;
+}
+
+/* ------------------------------------------------- 8. SAVAT VA CHECKOUT */
+
+.cart-body,
+.checkout-body {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-3);
+}
+
+.page__title {
+  font-size: var(--fs-xl);
+}
+
+/* Savat qatori */
+
+.cart-list {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-2);
+}
+
+.cart-row {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--sp-3);
+  padding: var(--sp-3);
+}
+
+.cart-row__media {
+  flex: 0 0 auto;
+  width: 64px;
+  height: 64px;
+  border-radius: var(--r-md);
+  background: var(--surface-2);
+  display: grid;
+  place-items: center;
+  overflow: hidden;
+}
+
+.cart-row__img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.cart-row__ph {
+  font-size: 28px;
+  opacity: 0.5;
+}
+
+.cart-row__main {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-1);
+}
+
+.cart-row__name {
+  font-size: var(--fs-md);
+  font-weight: 700;
+}
+
+.cart-row__opts {
+  color: var(--text-2);
+  font-size: var(--fs-xs);
+}
+
+.cart-row__foot {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--sp-2);
+  margin-top: var(--sp-1);
+}
+
+.cart-row__price {
+  font-size: var(--fs-sm);
+  white-space: nowrap;
+}
+
+.cart-row__del {
+  flex: 0 0 auto;
+  width: 32px;
+  height: 32px;
+  font-size: var(--fs-lg);
+  color: var(--text-3);
+}
+
+/* Progress-bar */
+
+.progress {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-2);
+  padding: var(--sp-3) var(--sp-4);
+  border-radius: var(--r-lg);
+  background: var(--surface);
+  box-shadow: var(--shadow-1);
+}
+
+.progress__text {
+  font-size: var(--fs-sm);
+  font-weight: 600;
+}
+
+.progress--warn .progress__text {
+  color: var(--warning);
+}
+
+.progress__track {
+  height: 6px;
+  border-radius: var(--r-full);
+  background: var(--surface-2);
+  overflow: hidden;
+}
+
+.progress__fill {
+  height: 100%;
+  border-radius: var(--r-full);
+  background: var(--brand);
+  transition: width 0.3s var(--ease);
+}
+
+/* Promokod */
+
+.promo__row {
+  display: flex;
+  gap: var(--sp-2);
+}
+
+.promo__row .input {
+  flex: 1;
+  min-width: 0;
+  text-transform: uppercase;
+}
+
+/* Placeholder katta harfga aylanmasin — u joyiga sig'may kesiladi */
+.promo__row .input::placeholder {
+  text-transform: none;
+}
+
+/* Upsell */
+
+.upsell__strip {
+  display: flex;
+  gap: var(--sp-2);
+  overflow-x: auto;
+  scrollbar-width: none;
+  padding-bottom: var(--sp-1);
+}
+
+.upsell__strip::-webkit-scrollbar {
+  display: none;
+}
+
+.upsell__card {
+  flex: 0 0 auto;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 2px;
+  max-width: 60vw;
+  padding: var(--sp-3) var(--sp-4);
+  border-radius: var(--r-md);
+  background: var(--surface);
+  box-shadow: var(--shadow-1);
+  text-align: left;
+}
+
+.upsell__name {
+  font-size: var(--fs-sm);
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.upsell__price {
+  font-size: var(--fs-xs);
+  color: var(--brand);
+  font-weight: 700;
+}
+
+.upsell .section-title {
+  margin: var(--sp-2) 0 var(--sp-2);
+  font-size: var(--fs-lg);
+}
+
+/* Summalar */
+
+.sums {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-2);
+}
+
+.sum-row {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--sp-3);
+  font-size: var(--fs-sm);
+  color: var(--text-2);
+}
+
+.sum-row--muted {
+  color: var(--text-3);
+  font-size: var(--fs-xs);
+}
+
+.sum-row--total {
+  margin-top: var(--sp-1);
+  padding-top: var(--sp-3);
+  border-top: 1px solid var(--border);
+  font-size: var(--fs-lg);
+  font-weight: 700;
+  color: var(--text);
+}
+
+/* Yakuniy tugma */
+
+.cart-cta {
+  position: sticky;
+  bottom: calc(var(--nav-h) + var(--safe-bottom) + var(--sp-2));
+  z-index: 10;
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-2);
+  margin-top: var(--sp-2);
+}
+
+.cart-cta__hint {
+  text-align: center;
+}
+
+/* Checkout bo'limlari */
+
+.co-section {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-3);
+}
+
+.co-section__title {
+  font-size: var(--fs-sm);
+  font-weight: 700;
+  color: var(--text-2);
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+}
+
+.addr__text {
+  font-size: var(--fs-sm);
+  flex: 1;
+}
+
+.hint.block {
+  display: block;
+}
+
+.form {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-3);
+}
+
+.form__row {
+  display: flex;
+  gap: var(--sp-3);
+}
+
+.form__row .field {
+  flex: 1;
+  min-width: 0;
+}
+
+.change-field {
+  margin-top: var(--sp-1);
+}
+
+.offer {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--sp-3);
+  padding: var(--sp-3) var(--sp-4);
+  border-radius: var(--r-lg);
+  background: var(--surface);
+  box-shadow: var(--shadow-1);
+  font-size: var(--fs-sm);
+  cursor: pointer;
+}
+
+.offer input[type='checkbox'] {
+  width: 22px;
+  height: 22px;
+  flex: 0 0 auto;
+  accent-color: var(--brand);
+}
+
+.branches .opt-row {
+  align-items: flex-start;
+  padding: var(--sp-3);
+}
+
+.branches .opt-row__name {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
 }

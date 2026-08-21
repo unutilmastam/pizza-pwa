@@ -115,14 +115,25 @@ export function getCachedMenuVersion() {
  * Faol filiallar ro'yxati (zona polygonlari, ish vaqti, stop-list bilan).
  * @returns {Promise<object[]>}
  */
-export async function getBranches() {}
+export async function getBranches() {
+  const { dbx, sdk } = await getFirebase();
+  const snap = await sdk.getDocs(
+    sdk.query(sdk.collection(dbx, 'branches'), sdk.where('active', '==', true))
+  );
+  return snap.docs.map((d) => ({ id: d.id, ...d.data() }));
+}
 
 /**
  * Bitta filial hujjati.
  * @param {string} branchId
  * @returns {Promise<?object>}
  */
-export async function getBranch(branchId) {}
+export async function getBranch(branchId) {
+  if (!branchId) return null;
+  const { dbx, sdk } = await getFirebase();
+  const snap = await sdk.getDoc(sdk.doc(dbx, 'branches', branchId));
+  return snap.exists() ? { id: snap.id, ...snap.data() } : null;
+}
 
 /**
  * Filialdagi stop-list (tugagan mahsulot va variantlar ro'yxati).
