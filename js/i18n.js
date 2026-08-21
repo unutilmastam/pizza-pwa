@@ -145,6 +145,10 @@ const DICT = {
     'address.deleted': 'Manzil o\'chirildi',
     'address.saveTitle': 'Saqlangan manzillar',
     'address.empty': 'Saqlangan manzil yo\'q',
+    'address.detecting': 'Manzil aniqlanmoqda...',
+    'address.geocodeError': 'Manzilni avtomatik aniqlab bo\'lmadi — yuqoridagi maydonga qo\'lda yozing',
+    'address.geocodeForbidden': 'Kalitda Geokoder ruxsati yo\'q (403). Nuqta xaritada belgilandi, manzil nomini qo\'lda yozing',
+    'address.geocodeLimit': 'Geokoder limiti tugadi. Manzil nomini qo\'lda yozing',
 
     'auth.title': 'Kirish',
     'auth.phone': 'Telefon raqam',
@@ -328,6 +332,10 @@ const DICT = {
     'address.deleted': 'Адрес удалён',
     'address.saveTitle': 'Сохранённые адреса',
     'address.empty': 'Сохранённых адресов нет',
+    'address.detecting': 'Определяем адрес...',
+    'address.geocodeError': 'Не удалось определить адрес автоматически — впишите его вручную в поле выше',
+    'address.geocodeForbidden': 'У ключа нет доступа к Геокодеру (403). Точка на карте отмечена, впишите адрес вручную',
+    'address.geocodeLimit': 'Лимит Геокодера исчерпан. Впишите адрес вручную',
 
     'auth.title': 'Вход',
     'auth.phone': 'Номер телефона',
@@ -511,6 +519,10 @@ const DICT = {
     'address.deleted': 'Address deleted',
     'address.saveTitle': 'Saved addresses',
     'address.empty': 'No saved addresses',
+    'address.detecting': 'Detecting the address...',
+    'address.geocodeError': 'Could not detect the address automatically — type it in the field above',
+    'address.geocodeForbidden': 'The key has no Geocoder access (403). The point is marked on the map, type the address manually',
+    'address.geocodeLimit': 'Geocoder quota exhausted. Type the address manually',
 
     'auth.title': 'Sign in',
     'auth.phone': 'Phone number',

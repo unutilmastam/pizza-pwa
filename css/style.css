@@ -1748,6 +1748,20 @@ body:has(.cart-cta) .toasts {
 
 /* Zona ma'lumoti */
 
+/* Xarita/geokoder ogohlantirishi — jim qolmasligi kerak */
+.map-notice {
+  padding: var(--sp-3) var(--sp-4);
+  border-radius: var(--r-md);
+  background: rgba(224, 163, 46, 0.14);
+  border-left: 3px solid var(--warning);
+  color: var(--text);
+  font-size: var(--fs-sm);
+}
+
+.map-notice[hidden] {
+  display: none;
+}
+
 .zone-info__box {
   display: flex;
   flex-direction: column;
