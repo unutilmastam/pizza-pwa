@@ -32,7 +32,7 @@ export const FIREBASE_SDK = {
  *
  * Render'da servis nomi boshqacha bo'lsa shu qatorni almashtiring.
  */
-export const API_BASE = 'https://pizza-api.onrender.com';
+export const API_BASE = 'https://pizza-api-yhd9.onrender.com';
 
 /**
  * Autentifikatsiya rejimi.
