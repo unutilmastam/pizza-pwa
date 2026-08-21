@@ -43,7 +43,19 @@ function emptyState() {
     /** delivery | pickup */
     orderType: 'delivery',
     /** @type {?string} qo'llangan promokod */
-    promoCode: null
+    promoCode: null,
+    /** Checkout maydonlari — keyingi buyurtmada ham eslab qolinadi. */
+    checkout: {
+      paymentMethod: 'cash',
+      changeFrom: null,
+      cutlery: 1,
+      comment: ''
+    },
+    /**
+     * @type {?object} rasmiylashtirilgan, lekin hali yuborilmagan buyurtma.
+     * Node servis 6-bosqichda ulanadi — shu paytgacha draft saqlanib turadi.
+     */
+    orderDraft: null
   };
 }
 
@@ -186,10 +198,31 @@ export function setOrderType(type) {
 
 /**
  * Promokodni saqlaydi yoki olib tashlaydi.
+ * Kod bu yerda TEKSHIRILMAYDI — `promocodes` kolleksiyasini client o'qiy
+ * olmaydi, uni buyurtma yaratishda Node servis tekshiradi (SPEC 3-bo'lim).
  * @param {?string} code
  */
 export function setPromoCode(code) {
   state.promoCode = code ? String(code).trim().toUpperCase() : null;
+  commit();
+}
+
+/**
+ * Checkout maydonlarini qisman yangilaydi.
+ * @param {{paymentMethod?: string, changeFrom?: ?number, cutlery?: number,
+ *          comment?: string}} patch
+ */
+export function setCheckout(patch) {
+  state.checkout = { ...state.checkout, ...patch };
+  commit();
+}
+
+/**
+ * Rasmiylashtirilgan buyurtma draftini saqlaydi.
+ * @param {?object} draft
+ */
+export function setOrderDraft(draft) {
+  state.orderDraft = draft || null;
   commit();
 }
 

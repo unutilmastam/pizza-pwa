@@ -3,7 +3,7 @@
 > Har seans boshida shu faylni o'qi. Faqat "Joriy bosqich" deb belgilangan
 > ishni bajar. Boshqa bosqichlarga o'tma. Tugagach shu faylni yangila.
 
-**Joriy bosqich: 2**
+**Joriy bosqich: 3**
 
 ---
 
@@ -133,7 +133,7 @@ Izoh:
 ---
 
 ## Bosqich 2 — savat va checkout
-Status: **joriy**
+Status: **bajarildi**
 
 `js/pages/cart.js`, `js/pages/checkout.js`
 - Savat: miqdor, o'chirish undo bilan, promokod, minimal summa
@@ -142,11 +142,57 @@ Status: **joriy**
   izoh, oferta checkbox
 
 Izoh:
+- `js/pages/cart.js` — qatorlar (rasm, konfiguratsiya matni, stepper,
+  narx), o'chirish "Qaytarish" toasti bilan, promokod bloki, progress-bar,
+  upsell tasmasi, breakdown va sticky CTA. `calcTotals()` shu fayldan
+  eksport qilinadi — checkout ham o'shani ishlatadi.
+- `js/pages/checkout.js` — 8 ta blok: buyurtma turi, manzil/filial, vaqt,
+  to'lov usuli (+ naqd uchun qaytim), idish-tovoq, izoh, buyurtma tarkibi,
+  oferta. Har bir maydon tekshiriladi.
+- **Buyurtma serverga yuborilmaydi** — bu ataylab. SPEC 3-bo'lim: client
+  `orders` ga yoza olmaydi, narxni Node servis qayta hisoblaydi
+  (6-bosqich). Shuning uchun "Buyurtma berish" to'liq validatsiyadan
+  o'tkazib, `state.orderDraft` ga `orders` sxemasiga mos draft yozadi va
+  buni oynada ochiq aytadi. Savat tozalanmaydi. Soxta buyurtma raqami
+  yoki status yaratilmadi.
+- **Promokod tekshirilmaydi** — `promocodes` ni client o'qiy olmaydi.
+  Kod `state.promoCode` ga saqlanadi, breakdown'da "Rasmiylashtirishda
+  tekshiriladi" deb turadi, chegirma 0. Node servis ulangach hisoblanadi.
+- **Yetkazish narxi va minimal summa** hozircha `config.js` dagi zaxira
+  qiymatlardan: 15 000 / 50 000 / bepul 150 000 dan. 3-bosqichda bular
+  filial zonasidan (`branches/{id}.zones[]`) olinadi.
+- **Manzil qo'lda kiritiladi** (ko'cha, kvartira, podyezd, qavat, domofon,
+  mo'ljal) — bottom-sheet forma. 3-bosqichda Yandex Maps xaritasi, reverse
+  geocode va zona tekshiruvi bilan almashtiriladi; `lat/lng` shundan keyin
+  to'ladi.
+- Pickup uchun `db.getBranches()` yozildi. Firestore'da `branches`
+  hali yo'q — ro'yxat bo'sh bo'lsa "Filiallar hali qo'shilmagan" chiqadi.
+  Masofa bo'yicha saralash 3-bosqichda.
+- Bu bosqichda qilinmadi (PROGRESS ro'yxatida yo'q): bonus slider,
+  Payme/Click redirect (faqat tanlash bor), kombo tarkibini almashtirish.
+- `js/state.js` ga qo'shildi: `checkout` (to'lov usuli, qaytim,
+  idish-tovoq, izoh — keyingi buyurtmada eslab qolinadi), `orderDraft`,
+  `setCheckout()`, `setOrderDraft()`.
+- CSS: savat qatori, progress-bar, upsell tasmasi, summalar, checkout
+  bo'limlari. Ikkita tuzatish: promokod placeholder'i katta harfda
+  kesilardi; toast sticky CTA ni to'sib qolardi (`:has(.cart-cta)` bilan
+  toast tepaga ko'chirildi, eski brauzerda avvalgidek qoladi).
+- `sw.js` `VERSION = 'v4'`, yangi sahifalar app shell ro'yxatida.
+- Tekshirildi (Chromium 390×844, soxta `db.js` bilan): bo'sh savat holati;
+  2 mahsulot → 92 000; stepper 2 dona → 130 000; o'chirish → "Qaytarish"
+  toasti → qator qaytdi; promokod PIZZA20 saqlandi va breakdown'da
+  ko'rindi; upsell 6 kartochka; 272 000 da "Yetkazish bepul"; 12 000 da
+  CTA o'chirilgan va "Minimal buyurtma summasi 50 000 so'm"; checkout
+  validatsiyasi: manzilsiz, kam qaytim (1 000), 30 daqiqadan yaqin vaqt va
+  ofertasiz holatlar to'g'ri xato berdi; to'liq to'ldirilgach draft
+  localStorage'ga yozildi (items, subtotal 272 000, cutlery 2, izoh,
+  changeFrom 500 000) va savat tegilmadi; pickup'da 2 filial ko'rindi,
+  tanlandi, yetkazish bepulga o'tdi. Konsolda xato yo'q.
 
 ---
 
 ## Bosqich 3 — manzil va zona
-Status: boshlanmagan
+Status: **joriy**
 
 `js/pages/address.js` — Yandex Maps JS API
 - Marker surish, reverse geocode, autocomplete
