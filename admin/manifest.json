@@ -1,0 +1,41 @@
+{
+  "id": "/admin/",
+  "name": "Pitsa — admin panel",
+  "short_name": "Pitsa admin",
+  "description": "Buyurtmalar oqimi, oshxona ekrani, menyu va filiallar boshqaruvi.",
+  "lang": "uz",
+  "dir": "ltr",
+  "start_url": "./index.html?source=pwa",
+  "scope": "./",
+  "display": "standalone",
+  "orientation": "any",
+  "background_color": "#14171c",
+  "theme_color": "#14171c",
+  "categories": ["business", "productivity"],
+  "icons": [
+    {
+      "src": "../icons/icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any"
+    },
+    {
+      "src": "../icons/icon-maskable.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "maskable"
+    }
+  ],
+  "shortcuts": [
+    {
+      "name": "Buyurtmalar",
+      "short_name": "Buyurtmalar",
+      "url": "./index.html#/orders"
+    },
+    {
+      "name": "Oshxona",
+      "short_name": "KDS",
+      "url": "./index.html#/kds"
+    }
+  ]
+}

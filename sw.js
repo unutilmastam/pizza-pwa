@@ -11,7 +11,7 @@
  * Statik fayl mazmuni o'zgarsa — VERSION ni oshiring.
  */
 
-const VERSION = 'v9';
+const VERSION = 'v10';
 const SHELL_CACHE = `pizza-shell-${VERSION}`;
 const RUNTIME_CACHE = `pizza-runtime-${VERSION}`;
 
@@ -104,6 +104,11 @@ self.addEventListener('fetch', (event) => {
 
   // Tashqi xizmatlar (Firebase, Node servis, Yandex Maps) — to'g'ridan-to'g'ri
   if (url.origin !== self.location.origin) return;
+
+  // Admin panelning O'Z service worker'i bor (`admin/sw.js`) va u tarmoq
+  // birinchi tamoyilida ishlaydi. Bu SW ning scope'i kengroq bo'lgani
+  // uchun admin fayllari ham unga tushib qolmasin — chetlab o'tamiz.
+  if (url.pathname.includes('/admin/')) return;
 
   // config.js — faqat tarmoqdan, keshga umuman tegmaydi
   if (isNeverCached(url)) {

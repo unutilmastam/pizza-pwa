@@ -15,9 +15,17 @@ import express from 'express';
 import { config, checkConfig, keyDiagnostics } from './src/config.js';
 import { pingDb } from './src/firebase.js';
 import { requestOtp, verifyOtp, httpError } from './src/otp.js';
-import { createOrder, updateStatus, PAYMENT_METHODS } from './src/orders.js';
+import { createOrder, updateStatus, assignCourier, PAYMENT_METHODS } from './src/orders.js';
 import { startCron, runGuaranteeJob, runBonusJob, runReportJob } from './src/cron.js';
-import { cors, requireAuth, requireAdmin, rateLimit, errorHandler } from './src/middleware.js';
+import {
+  cors, requireAuth, requireAdmin, requireStaff, rateLimit, errorHandler
+} from './src/middleware.js';
+
+/** Buyurtma oqimini boshqara oladigan rollar (SPEC 104). */
+const ORDER_ROLES = ['superadmin', 'manager', 'operator', 'kitchen'];
+
+/** Kuryer tayinlay oladigan rollar — oshxona buni qilmaydi. */
+const DISPATCH_ROLES = ['superadmin', 'manager', 'operator'];
 
 const app = express();
 const started = Date.now();
@@ -131,11 +139,25 @@ app.post('/api/orders', requireAuth, rateLimit({ windowMs: 60000, max: 10 }), wr
   res.status(order.duplicate ? 200 : 201).json(order);
 }));
 
-// Statusni faqat admin o'zgartiradi (kuryer paneli keyingi bosqichda)
-app.patch('/api/orders/:id/status', requireAuth, requireAdmin, wrap(async (req, res) => {
+// Statusni admin panelidagi xodim o'zgartiradi. Huquq `staff/{uid}`
+// hujjatidagi rol bo'yicha beriladi; ADMIN_UIDS bootstrap yo'li bo'lib
+// qoladi (birinchi xodim yaratilgunicha).
+app.patch('/api/orders/:id/status', requireAuth, requireStaff(ORDER_ROLES), wrap(async (req, res) => {
   const result = await updateStatus({
     orderId: req.params.id,
     status: String(req.body?.status || ''),
+    reason: req.body?.reason,
+    etaMinutes: req.body?.etaMinutes,
+    by: req.user.uid
+  });
+  res.json(result);
+}));
+
+// Kuryer tayinlash (SPEC 110)
+app.patch('/api/orders/:id/courier', requireAuth, requireStaff(DISPATCH_ROLES), wrap(async (req, res) => {
+  const result = await assignCourier({
+    orderId: req.params.id,
+    courierId: String(req.body?.courierId || ''),
     by: req.user.uid
   });
   res.json(result);

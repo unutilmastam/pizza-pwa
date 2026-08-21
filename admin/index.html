@@ -1,0 +1,63 @@
+<!DOCTYPE html>
+<html lang="uz">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="robots" content="noindex">
+  <meta name="theme-color" content="#14171c">
+  <title>Pitsa — admin</title>
+  <link rel="manifest" href="./manifest.json">
+  <link rel="icon" href="../icons/icon.svg" type="image/svg+xml">
+  <link rel="stylesheet" href="./css/admin.css">
+</head>
+<body>
+  <div class="admin" id="admin" hidden>
+    <aside class="side" id="side">
+      <div class="side__head">
+        <span class="side__logo" aria-hidden="true">🍕</span>
+        <span class="side__title" data-i18n="app.title">Pitsa — admin</span>
+      </div>
+      <nav class="side__nav" id="sideNav" aria-label="Bo'limlar"></nav>
+      <div class="side__foot">
+        <p class="side__staff" id="staffLine"></p>
+        <div class="side__actions">
+          <button class="btn btn--ghost btn--sm" id="langBtn" type="button">UZ</button>
+          <button class="btn btn--ghost btn--sm" id="themeBtn" type="button" aria-label="Mavzu">◐</button>
+          <button class="btn btn--ghost btn--sm" id="logoutBtn" type="button" data-i18n="auth.logout">Chiqish</button>
+        </div>
+      </div>
+    </aside>
+
+    <div class="main">
+      <header class="topbar">
+        <button class="icon-btn topbar__menu" id="menuBtn" type="button" aria-label="Menyu">☰</button>
+        <h1 class="topbar__title" id="pageTitle"></h1>
+        <div class="topbar__right" id="topbarSlot"></div>
+      </header>
+      <main class="content" id="content" tabindex="-1"></main>
+    </div>
+
+    <div class="side-backdrop" id="sideBackdrop" hidden></div>
+  </div>
+
+  <div class="boot" id="boot">
+    <div class="boot__spinner" aria-hidden="true"></div>
+    <p class="boot__text">Yuklanmoqda…</p>
+  </div>
+
+  <div class="toasts" id="toasts" role="status" aria-live="polite"></div>
+
+  <script type="module" src="./js/app.js"></script>
+  <script>
+    // Admin panelning o'z SW'i — tarmoq birinchi. Ildizdagi SW ning
+    // scope'i kengroq, lekin brauzer eng aniq mos keluvchisini tanlaydi.
+    if ('serviceWorker' in navigator) {
+      window.addEventListener('load', () => {
+        navigator.serviceWorker.register('./sw.js', { scope: './' }).catch((e) => {
+          console.warn('Admin SW ro\'yxatdan o\'tmadi:', e);
+        });
+      });
+    }
+  </script>
+</body>
+</html>
