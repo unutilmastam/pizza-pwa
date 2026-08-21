@@ -225,7 +225,12 @@ export async function updateUserProfile(uid, patch) {
  * @param {number} [limit=50]
  * @returns {Promise<object[]>}
  */
-export async function getBonusHistory(uid, limit) {}
+export async function getBonusHistory(uid, limit = 50) {
+  if (!uid) return [];
+  const { dbx, sdk } = await getFirebase();
+  const snap = await sdk.getDocs(sdk.collection(dbx, 'users', uid, 'bonusHistory'));
+  return byNewest(snap.docs.map((d) => ({ id: d.id, ...d.data() }))).slice(0, limit);
+}
 
 /* --------------------------------------------------------------- manzillar */
 
@@ -283,44 +288,161 @@ export async function deleteAddress(uid, addressId) {
 
 /* --------------------------------------------------------------- buyurtma */
 
+/** Yetkazilgan yoki bekor qilingan — bular "faol" hisoblanmaydi. */
+const FINAL_STATUSES = ['delivered', 'canceled'];
+
+/**
+ * Buyurtmalarni yangisi birinchi bo'lib saralaydi.
+ * @param {object[]} list
+ * @returns {object[]}
+ */
+function byNewest(list) {
+  return list.sort((a, b) => {
+    const at = toMillis(a.createdAt);
+    const bt = toMillis(b.createdAt);
+    return bt - at;
+  });
+}
+
+/**
+ * Firestore Timestamp yoki ISO satrini millisekundga aylantiradi.
+ * @param {*} value
+ * @returns {number}
+ */
+function toMillis(value) {
+  if (!value) return 0;
+  if (typeof value.toMillis === 'function') return value.toMillis();
+  if (typeof value.seconds === 'number') return value.seconds * 1000;
+  const ms = new Date(value).getTime();
+  return Number.isFinite(ms) ? ms : 0;
+}
+
 /**
  * Foydalanuvchining buyurtmalari tarixi, yangisi birinchi.
+ *
+ * Saralash CLIENT tomonda: `where('uid')` + `orderBy('createdAt')` Firestore'da
+ * kompozit indeks talab qiladi, bitta foydalanuvchining buyurtmalari esa oz.
+ *
  * @param {string} uid
  * @param {number} [limit=20]
  * @returns {Promise<object[]>}
  */
-export async function getOrders(uid, limit) {}
+export async function getOrders(uid, limit = 20) {
+  if (!uid) return [];
+  const { dbx, sdk } = await getFirebase();
+  const snap = await sdk.getDocs(
+    sdk.query(sdk.collection(dbx, 'orders'), sdk.where('uid', '==', uid))
+  );
+  const list = snap.docs.map((d) => ({ id: d.id, ...d.data() }));
+  return byNewest(list).slice(0, limit);
+}
 
 /**
  * Bitta buyurtma.
  * @param {string} orderId
  * @returns {Promise<?object>}
  */
-export async function getOrder(orderId) {}
+export async function getOrder(orderId) {
+  if (!orderId) return null;
+  const { dbx, sdk } = await getFirebase();
+  const snap = await sdk.getDoc(sdk.doc(dbx, 'orders', orderId));
+  return snap.exists() ? { id: snap.id, ...snap.data() } : null;
+}
 
 /**
  * Buyurtmani real-time kuzatadi (`onSnapshot`) — status stepper uchun.
+ *
  * @param {string} orderId
- * @param {(order: object) => void} onChange
+ * @param {(order: ?object) => void} onChange
+ * @param {(error: Error) => void} [onError]
  * @returns {() => void} obunani to'xtatuvchi funksiya
  */
-export function watchOrder(orderId, onChange) {}
+export function watchOrder(orderId, onChange, onError) {
+  let stop = null;
+  let cancelled = false;
+
+  getFirebase().then(({ dbx, sdk }) => {
+    if (cancelled) return;
+    stop = sdk.onSnapshot(
+      sdk.doc(dbx, 'orders', orderId),
+      (snap) => onChange(snap.exists() ? { id: snap.id, ...snap.data() } : null),
+      (error) => {
+        console.error('[db] watchOrder xatosi:', error);
+        if (onError) onError(error);
+      }
+    );
+  }).catch((error) => {
+    console.error('[db] watchOrder ulanmadi:', error);
+    if (onError) onError(error);
+  });
+
+  return () => {
+    cancelled = true;
+    if (stop) stop();
+  };
+}
 
 /**
- * Faol (yetkazilmagan) buyurtmani kuzatadi — bosh sahifadagi holat plashkasi.
+ * Faol (yetkazilmagan) buyurtmalarni kuzatadi.
  * @param {string} uid
  * @param {(orders: object[]) => void} onChange
+ * @param {(error: Error) => void} [onError]
  * @returns {() => void}
  */
-export function watchActiveOrders(uid, onChange) {}
+export function watchActiveOrders(uid, onChange, onError) {
+  let stop = null;
+  let cancelled = false;
+
+  getFirebase().then(({ dbx, sdk }) => {
+    if (cancelled || !uid) return;
+    stop = sdk.onSnapshot(
+      sdk.query(sdk.collection(dbx, 'orders'), sdk.where('uid', '==', uid)),
+      (snap) => {
+        const list = snap.docs
+          .map((d) => ({ id: d.id, ...d.data() }))
+          .filter((o) => !FINAL_STATUSES.includes(o.status));
+        onChange(byNewest(list));
+      },
+      (error) => {
+        console.error('[db] watchActiveOrders xatosi:', error);
+        if (onError) onError(error);
+      }
+    );
+  }).catch((error) => {
+    console.error('[db] watchActiveOrders ulanmadi:', error);
+    if (onError) onError(error);
+  });
+
+  return () => {
+    cancelled = true;
+    if (stop) stop();
+  };
+}
 
 /**
  * Kuryer joylashuvini real-time kuzatadi.
  * @param {string} courierId
- * @param {(location: {lat: number, lng: number, at: *}) => void} onChange
+ * @param {(courier: ?object) => void} onChange
  * @returns {() => void}
  */
-export function watchCourier(courierId, onChange) {}
+export function watchCourier(courierId, onChange) {
+  let stop = null;
+  let cancelled = false;
+
+  getFirebase().then(({ dbx, sdk }) => {
+    if (cancelled || !courierId) return;
+    stop = sdk.onSnapshot(
+      sdk.doc(dbx, 'couriers', courierId),
+      (snap) => onChange(snap.exists() ? { id: snap.id, ...snap.data() } : null),
+      (error) => console.error('[db] watchCourier xatosi:', error)
+    );
+  }).catch((error) => console.error('[db] watchCourier ulanmadi:', error));
+
+  return () => {
+    cancelled = true;
+    if (stop) stop();
+  };
+}
 
 /* ---------------------------------------------------------------- baholash */
 
@@ -330,7 +452,12 @@ export function watchCourier(courierId, onChange) {}
  * @param {{food: number, courier: number, text?: string, photo?: string}} rating
  * @returns {Promise<void>}
  */
-export async function saveRating(orderId, rating) {}
+export async function saveRating(orderId, rating) {
+  const { dbx, sdk } = await getFirebase();
+  await sdk.updateDoc(sdk.doc(dbx, 'orders', orderId), {
+    rating: { ...rating, at: sdk.serverTimestamp() }
+  });
+}
 
 /**
  * Baholash rasmini Storage'ga yuklaydi va URL qaytaradi.

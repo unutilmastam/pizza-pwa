@@ -35,13 +35,19 @@ let renderToken = 0;
  */
 function compile(pattern) {
   const keys = [];
+  // Har bo'lakni alohida ko'rib chiqamiz: `:id` — parametr, qolgani —
+  // aynan matn (regex belgilari xavfsizlantiriladi).
   const source = pattern
     .replace(/\/+$/, '')
-    .replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
-    .replace(/\\\/:(\w+)/g, (m, key) => {
-      keys.push(key);
-      return '/([^/]+)';
-    });
+    .split('/')
+    .map((segment) => {
+      if (segment.startsWith(':')) {
+        keys.push(segment.slice(1));
+        return '([^/]+)';
+      }
+      return segment.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    })
+    .join('/');
   return { keys, regex: new RegExp(`^${source || '/'}$`) };
 }
 

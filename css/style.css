@@ -1893,3 +1893,221 @@ body:has(.cart-cta) .toasts {
   font-size: var(--fs-xl);
   font-variant-numeric: tabular-nums;
 }
+
+/* --------------------------------------------- 11. TREKING VA PROFIL */
+
+.order-body,
+.profile-body {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-3);
+}
+
+.order-list {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-2);
+}
+
+.order-card {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-1);
+  text-align: left;
+  cursor: pointer;
+}
+
+.order-card__items {
+  color: var(--text-2);
+  font-size: var(--fs-sm);
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+.order-card__foot {
+  margin-top: var(--sp-2);
+}
+
+.order-card__repeat {
+  min-height: 36px;
+  padding: 0 var(--sp-4);
+  font-size: var(--fs-sm);
+}
+
+.badge--done { background: rgba(47, 158, 91, 0.14); color: var(--success); }
+.badge--canceled { background: rgba(217, 65, 65, 0.14); color: var(--danger); }
+
+.order-head h2 {
+  font-size: var(--fs-lg);
+}
+
+/* Kafolat taymeri */
+
+.guarantee {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--sp-3);
+  padding: var(--sp-3) var(--sp-4);
+  border-radius: var(--r-lg);
+  background: var(--brand-soft);
+}
+
+.guarantee__label {
+  font-size: var(--fs-sm);
+  color: var(--text-2);
+}
+
+.guarantee__value {
+  font-size: var(--fs-xl);
+  font-variant-numeric: tabular-nums;
+  color: var(--brand);
+}
+
+.guarantee--broken {
+  background: rgba(217, 65, 65, 0.12);
+}
+
+.guarantee--broken .guarantee__value {
+  font-size: var(--fs-md);
+  color: var(--danger);
+}
+
+/* Status stepper */
+
+.stepper-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+  padding: var(--sp-4);
+  border-radius: var(--r-lg);
+  background: var(--surface);
+  box-shadow: var(--shadow-1);
+}
+
+.step {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: var(--sp-3);
+  padding: var(--sp-2) 0 var(--sp-2) var(--sp-1);
+  color: var(--text-3);
+  font-size: var(--fs-sm);
+}
+
+/* Nuqtalarni bog'lovchi chiziq */
+.step:not(:last-child)::before {
+  content: '';
+  position: absolute;
+  left: 9px;
+  top: 60%;
+  width: 2px;
+  height: 100%;
+  background: var(--surface-3);
+}
+
+.step__dot {
+  position: relative;
+  z-index: 1;
+  width: 12px;
+  height: 12px;
+  flex: 0 0 auto;
+  border-radius: var(--r-full);
+  background: var(--surface-3);
+}
+
+.step__label {
+  flex: 1;
+}
+
+.step__time {
+  font-variant-numeric: tabular-nums;
+  font-size: var(--fs-xs);
+}
+
+.step.is-done {
+  color: var(--text-2);
+}
+
+.step.is-done .step__dot {
+  background: var(--success);
+}
+
+.step.is-current {
+  color: var(--text);
+  font-weight: 700;
+}
+
+.step.is-current .step__dot {
+  background: var(--brand);
+  box-shadow: 0 0 0 4px var(--brand-soft);
+}
+
+/* Kuryer */
+
+.courier {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-1);
+}
+
+.map--courier {
+  height: 240px;
+}
+
+/* Baholash yulduzlari */
+
+.stars {
+  display: flex;
+  gap: var(--sp-2);
+}
+
+.stars__item {
+  font-size: 30px;
+  line-height: 1;
+  color: var(--text-3);
+  transition: transform 0.12s var(--ease), color 0.18s var(--ease);
+}
+
+.stars__item.is-active {
+  color: var(--warning);
+}
+
+.stars__item:active {
+  transform: scale(1.15);
+}
+
+/* Profil */
+
+.profile-card,
+.bonus-card {
+  width: 100%;
+  text-align: left;
+}
+
+.bonus-card {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--sp-3);
+}
+
+.bonus-card__value {
+  font-size: var(--fs-xl);
+  color: var(--brand);
+}
+
+.profile-row .opt-row__price {
+  color: var(--text-3);
+}
+
+.opt-row__price.is-negative {
+  color: var(--danger);
+}
+
+.profile .section-title {
+  font-size: var(--fs-lg);
+  margin: var(--sp-3) 0 var(--sp-1);
+}
