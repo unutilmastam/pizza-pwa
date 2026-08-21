@@ -3,7 +3,7 @@
  */
 
 import { config } from './config.js';
-import { getAuth } from './firebase.js';
+import { getAuth, getDb } from './firebase.js';
 import { httpError } from './otp.js';
 
 /**
@@ -53,6 +53,10 @@ export async function requireAuth(req, res, next) {
 
 /**
  * Faqat `ADMIN_UIDS` ro'yxatidagilar uchun. `requireAuth` dan keyin turadi.
+ *
+ * Bu ro'yxat — BOOTSTRAP yo'li: `staff` kolleksiyasi hali bo'sh bo'lganda
+ * ham servisni boshqarish uchun. Kundalik huquqlar `requireStaff()` da.
+ *
  * @type {import('express').RequestHandler}
  */
 export function requireAdmin(req, res, next) {
@@ -61,6 +65,49 @@ export function requireAdmin(req, res, next) {
     return;
   }
   next();
+}
+
+/**
+ * `staff/{uid}` hujjati bo'yicha huquq tekshiradi.
+ *
+ * Rollar SPEC 104 dan: `superadmin`, `manager`, `operator`, `kitchen`,
+ * `courier`. `ADMIN_UIDS` dagi uid har doim o'tadi — birinchi xodim
+ * yaratilgunicha kerak.
+ *
+ * Rol `req.staff` ga yoziladi, shuning uchun keyingi qatlam kim nima
+ * qilganini bilib turadi (`statusHistory.by`).
+ *
+ * @param {string[]} roles - ruxsat etilgan rollar
+ * @returns {import('express').RequestHandler}
+ */
+export function requireStaff(roles) {
+  return async (req, res, next) => {
+    try {
+      if (!req.user) throw httpError(401, 'no-token', 'Token yo\'q');
+
+      // Bootstrap: env dagi uid rolsiz ham o'tadi
+      if (config.rules.adminUids.includes(req.user.uid)) {
+        req.staff = { uid: req.user.uid, role: 'superadmin', source: 'env' };
+        next();
+        return;
+      }
+
+      const db = await getDb();
+      const snap = await db.collection('staff').doc(req.user.uid).get();
+      if (!snap.exists) throw httpError(403, 'not-staff', 'Xodim topilmadi');
+
+      const staff = snap.data();
+      if (staff.active === false) throw httpError(403, 'staff-disabled', 'Hisob o\'chirilgan');
+      if (!roles.includes(staff.role)) {
+        throw httpError(403, 'role-forbidden', 'Bu amal sizning rolingizga ruxsat etilmagan');
+      }
+
+      req.staff = { uid: req.user.uid, ...staff, source: 'firestore' };
+      next();
+    } catch (e) {
+      next(e.status ? e : httpError(403, 'not-staff', 'Ruxsat yo\'q'));
+    }
+  };
 }
 
 /** IP bo'yicha so'rov sanog'i — xotirada (bitta instansiya uchun yetarli). */

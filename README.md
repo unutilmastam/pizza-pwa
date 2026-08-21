@@ -21,6 +21,15 @@ js/
   i18n.js             uz / ru / en matnlari
   router.js, state.js, ui.js, utils.js
   pages/              menu, product, cart, checkout, address, auth, order, profile
+admin/                admin panel — ALOHIDA PWA (o'z manifest va SW bilan)
+  index.html
+  css/admin.css
+  js/
+    config.js         rollar, bo'limlar; Firebase sozlamalari ../../js dan
+    auth.js           Firebase Auth + staff kolleksiyasida rol
+    db.js             admin uchun BARCHA Firestore chaqiruvlari
+    api.js            Node servis (status, kuryer)
+    pages/            login, dashboard, orders, kds, menu, branches, promos, reports
 server/               Node servis (Express + Firebase Admin SDK)
 tools/                bir martalik seed vositalari (brauzerda ochiladi)
 docs/                 SPEC, PROGRESS va demo ma'lumot fayllari
@@ -97,7 +106,8 @@ va nima yetishmayotganini `problems` ro'yxatida ko'rsatadi.
 | `POST` | `/api/auth/send-otp` | hamma |
 | `POST` | `/api/auth/verify-otp` | hamma |
 | `POST` | `/api/orders` | Firebase ID token |
-| `PATCH` | `/api/orders/:id/status` | `ADMIN_UIDS` |
+| `PATCH` | `/api/orders/:id/status` | staff: superadmin, manager, operator, kitchen |
+| `PATCH` | `/api/orders/:id/courier` | staff: superadmin, manager, operator |
 | `POST` | `/api/jobs/:name` (`guarantee`, `bonus`, `report`) | `ADMIN_UIDS` |
 
 Xato javobi doim bir xil ko'rinishda:
@@ -300,6 +310,82 @@ curl "https://pizza-api.onrender.com/api/health?deep=1"
 `ok: true` va bo'sh `problems` — hammasi joyida. `problems` ichida
 yozilgan har bir satr qaysi environment o'zgaruvchisi yetishmayotganini
 aytadi.
+
+## Admin panel
+
+Manzil: **`/pizza-pwa/admin/`** — mijoz ilovasidan alohida PWA, o'z
+manifest va service worker'i bilan.
+
+### Kirish va rollar
+
+Kirish mijoz ilovasidagi bilan bir xil OTP yo'lidan ketadi, lekin undan
+keyin YANA BIR tekshiruv bor: `staff/{uid}` hujjati bo'lishi va
+`active !== false` bo'lishi shart. Hujjat yo'q bo'lsa sessiya darhol
+yopiladi — mijoz raqami bilan panelga kirib bo'lmaydi.
+
+| Rol | Ko'radigan bo'limlari |
+| --- | --- |
+| `superadmin` | hammasi |
+| `manager` | hammasi |
+| `operator` | boshqaruv, buyurtmalar, KDS |
+| `kitchen` | faqat KDS |
+| `courier` | panelga kirolmaydi (kuryerning o'z ilovasi bo'ladi) |
+
+Servis tomonida ham shu rollar tekshiriladi (`requireStaff`): statusni
+`superadmin/manager/operator/kitchen`, kuryer tayinlashni esa
+`superadmin/manager/operator` o'zgartira oladi. `ADMIN_UIDS` bootstrap
+yo'li bo'lib qoladi — `staff` bo'sh bo'lganda ham servisni boshqarish
+uchun.
+
+### Birinchi xodimni yaratish
+
+`staff` kolleksiyasi bo'sh bo'lgani uchun birinchi superadmin qo'lda
+beriladi:
+
+1. Mijoz ilovasida telefon raqamingiz bilan kiring;
+2. **`/pizza-pwa/tools/seed-staff.html`** ni oching — u Firebase
+   sessiyasidan `uid` ni o'zi oladi;
+3. Rolni `superadmin` qilib "Rolni berish" ni bosing;
+4. `/pizza-pwa/admin/` ni oching.
+
+Firestore qoidalari qo'yilgach (8-bosqich) `staff` ga faqat
+`superadmin` yoza oladi va bu vosita ishlamay qoladi — shuning uchun
+birinchi xodim aynan shu yerdan beriladi.
+
+### Bo'limlar
+
+- **Boshqaruv** — bugungi buyurtma, tushum, o'rtacha chek. Buyurtmalar
+  obunasidan hisoblanadi, qo'shimcha so'rovsiz.
+- **Buyurtmalar** — real vaqtdagi oqim, yangi buyurtmada ovoz signali.
+  Qabul qilish (tayyorlanish vaqti bilan), sabab ko'rsatib rad etish,
+  keyingi bosqich, kuryer tayinlash.
+- **Oshxona (KDS)** — kartochka, taymer, "Tayyor". Belgilangan vaqtdan
+  oshsa kartochka qizil bo'ladi.
+- **Menyu** — kategoriya va mahsulot CRUD. `menu/current` BITTA hujjat
+  bo'lgani uchun o'zgarishlar xotirada to'planadi va **"Menyuni chop
+  etish"** bosilganda bir marta yoziladi; versiya avtomatik oshadi
+  (mijoz ilovasi keshni aynan versiya bo'yicha yangilaydi).
+- **Filiallar** — filial CRUD, zona polygonlari, stop-list.
+  Polygon nuqtalari `lat, lng` qatorlari ko'rinishida kiritiladi va
+  `[{lat, lng}]` obyektlari bo'lib saqlanadi (Firestore ichma-ich
+  massivni qabul qilmaydi).
+- **Promokodlar** — CRUD. Hujjat ID = kodning o'zi, shuning uchun kod
+  yaratilgandan keyin o'zgartirilmaydi.
+- **Hisobotlar** — `reports/{YYYY-MM-DD}` (cron yozadi) va bugungi kun
+  jonli hisoblanadi. Diagramma tashqi kutubxonasiz, inline SVG.
+
+### Rasm yuklash haqida
+
+Firebase Storage bepul planda mavjud emas, shuning uchun menyuda rasm
+**yuklanmaydi** — rasm manzillari qo'lda kiritiladi, fayllar esa
+GitHub Pages'dagi `images/` papkasida yotadi.
+
+### Keshlash
+
+Admin SW **tarmoq birinchi** tamoyilida ishlaydi: xodim doim eng yangi
+kodni oladi, kesh faqat internet uzilganda zaxira bo'ladi. Mijoz
+ilovasidagi SW esa "keshdan ber, fonda yangila" — u admin yo'lini
+chetlab o'tadi (scope'i kengroq bo'lsa ham).
 
 ## Ma'lumotni to'ldirish
 

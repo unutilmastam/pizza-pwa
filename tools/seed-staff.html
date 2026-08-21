@@ -1,0 +1,445 @@
+<!DOCTYPE html>
+<html lang="uz">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="robots" content="noindex">
+  <title>Seed — xodim (staff) roli</title>
+  <style>
+    :root {
+      color-scheme: light dark;
+      --bg: #f6f7f9;
+      --surface: #fff;
+      --border: #e3e6ec;
+      --text: #14171c;
+      --muted: #5b6270;
+      --brand: #e2662a;
+      --ok: #2f9e5b;
+      --err: #d94141;
+      --warn: #e0a32e;
+    }
+    @media (prefers-color-scheme: dark) {
+      :root {
+        --bg: #0f1115;
+        --surface: #171a21;
+        --border: #272c36;
+        --text: #eef1f6;
+        --muted: #a8b0bf;
+      }
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      padding: 32px 20px 64px;
+      background: var(--bg);
+      color: var(--text);
+      font: 16px/1.5 -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    }
+    main { max-width: 720px; margin: 0 auto; }
+    h1 { font-size: 22px; margin: 0 0 4px; }
+    .sub { color: var(--muted); font-size: 14px; margin-bottom: 24px; }
+    .card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 14px;
+      padding: 20px;
+      margin-bottom: 16px;
+    }
+    .card h2 { font-size: 15px; margin: 0 0 12px; text-transform: uppercase; letter-spacing: .04em; color: var(--muted); }
+    dl { display: grid; grid-template-columns: auto 1fr; gap: 6px 16px; margin: 0; font-size: 14px; }
+    dt { color: var(--muted); }
+    dd { margin: 0; font-family: ui-monospace, SFMono-Regular, Menlo, monospace; word-break: break-all; }
+    dd.bad { color: var(--err); font-weight: 600; }
+    dd.good { color: var(--ok); }
+    .actions { display: flex; flex-wrap: wrap; gap: 10px; margin-bottom: 16px; }
+    button {
+      font: inherit;
+      font-weight: 600;
+      min-height: 46px;
+      padding: 0 22px;
+      border: 0;
+      border-radius: 10px;
+      background: var(--brand);
+      color: #fff;
+      cursor: pointer;
+    }
+    button.secondary {
+      background: transparent;
+      color: var(--text);
+      box-shadow: inset 0 0 0 1px var(--border);
+    }
+    button:disabled { opacity: .5; cursor: not-allowed; }
+    .log {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 14px;
+      padding: 16px 20px;
+      font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+      font-size: 13px;
+      white-space: pre-wrap;
+      word-break: break-word;
+      min-height: 90px;
+    }
+    .log p { margin: 0 0 6px; }
+    .log .ok { color: var(--ok); }
+    .log .err { color: var(--err); font-weight: 600; }
+    .log .warn { color: var(--warn); }
+    .log .muted { color: var(--muted); }
+    .note {
+      border-left: 3px solid var(--brand);
+      padding-left: 14px;
+      color: var(--muted);
+      font-size: 14px;
+      margin: 0 0 10px;
+    }
+    input, select {
+      font: inherit;
+      width: 100%;
+      min-height: 44px;
+      padding: 0 12px;
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      background: var(--surface);
+      color: var(--text);
+      margin-bottom: 12px;
+    }
+    label { display: block; font-size: 14px; color: var(--muted); margin-bottom: 6px; }
+    code { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; }
+  </style>
+</head>
+<body>
+<main>
+  <h1>Xodim roli (staff)</h1>
+  <p class="sub">Bir martalik vosita. <code>staff/{uid}</code> hujjatini yaratadi — admin panelga kirish shu hujjat orqali ochiladi.</p>
+
+  <div class="card">
+    <h2>Holat</h2>
+    <dl>
+      <dt>projectId</dt><dd id="infoProject">o'qilmoqda...</dd>
+      <dt>Sessiya</dt><dd id="infoAuth">—</dd>
+      <dt>uid</dt><dd id="infoUid">—</dd>
+      <dt>Mavjud rol</dt><dd id="infoRole">—</dd>
+    </dl>
+  </div>
+
+  <div class="card">
+    <h2>Diqqat</h2>
+    <p class="note">
+      Rol <strong>ilovada kirgan foydalanuvchi</strong> uchun beriladi: avval
+      <a href="../index.html#/auth">ilovada kiring</a>, so'ng bu sahifani yangilang.
+      <code>uid</code> Firebase sessiyasidan o'qiladi; sessiya topilmasa
+      ilovaning <code>localStorage</code> holatidan olinadi va uni qo'lda ham
+      kiritish mumkin.
+    </p>
+    <p class="note">
+      Bu vosita Firestore qoidalari hali qo'yilmagan paytda ishlaydi
+      (8-bosqich). Qoidalar yoqilgach <code>staff</code> ga faqat
+      <code>superadmin</code> yoza oladi va bu sahifa ishlamay qoladi —
+      shuning uchun birinchi superadmin aynan shu yerdan beriladi.
+    </p>
+  </div>
+
+  <div class="card">
+    <h2>Xodim</h2>
+    <label for="uidInput">uid</label>
+    <input id="uidInput" type="text" placeholder="ilovada kiring yoki uid yozing">
+
+    <label for="nameInput">Ism</label>
+    <input id="nameInput" type="text" placeholder="Admin" value="Admin">
+
+    <label for="roleInput">Rol</label>
+    <select id="roleInput">
+      <option value="superadmin" selected>superadmin — hamma narsa</option>
+      <option value="manager">manager — menyu, filial, promokod, hisobot</option>
+      <option value="operator">operator — buyurtmalar oqimi</option>
+      <option value="kitchen">kitchen — faqat KDS</option>
+      <option value="courier">courier — kuryer ilovasi</option>
+    </select>
+  </div>
+
+  <div class="actions">
+    <button id="writeBtn" type="button" disabled>Rolni berish</button>
+    <button id="readBtn" class="secondary" type="button" disabled>Mavjud rolni o'qish</button>
+    <button id="clearBtn" class="secondary" type="button">Kesh va SW ni tozalash</button>
+  </div>
+
+  <div class="log" id="log" role="status" aria-live="polite"></div>
+</main>
+
+<script type="module">
+  /*
+   * Mantiq `tools/seed.html` bilan bir xil: config keshni chetlab o'tib
+   * o'qiladi, har bosqichga timeout qo'yilgan, xatolar jim qolmaydi.
+   */
+
+  const logEl = document.getElementById('log');
+  const uidInput = document.getElementById('uidInput');
+  const nameInput = document.getElementById('nameInput');
+  const roleInput = document.getElementById('roleInput');
+  const writeBtn = document.getElementById('writeBtn');
+  const readBtn = document.getElementById('readBtn');
+  const clearBtn = document.getElementById('clearBtn');
+
+  /** Har bir bosqich uchun kutish chegarasi (ms). */
+  const TIMEOUT = { fetch: 15000, sdk: 20000, auth: 8000, write: 20000 };
+
+  let cfgModule = null;
+  let firestore = null;
+
+  /**
+   * Ekranga bitta qator yozadi.
+   * @param {string} text
+   * @param {'info'|'ok'|'err'|'warn'|'muted'} [kind='info']
+   */
+  function log(text, kind = 'info') {
+    const time = new Date().toLocaleTimeString('uz-UZ', { hour12: false });
+    const line = document.createElement('p');
+    if (kind !== 'info') line.className = kind;
+    line.textContent = `${time}  ${text}`;
+    logEl.append(line);
+    logEl.scrollTop = logEl.scrollHeight;
+  }
+
+  /**
+   * Va'da belgilangan vaqtda tugamasa — xato beradi.
+   * @template T
+   * @param {Promise<T>} promise
+   * @param {number} ms
+   * @param {string} label
+   * @returns {Promise<T>}
+   */
+  function withTimeout(promise, ms, label) {
+    let timer = null;
+    const guard = new Promise((_, reject) => {
+      timer = setTimeout(
+        () => reject(new Error(`${label}: ${Math.round(ms / 1000)} soniyada javob bo'lmadi`)),
+        ms
+      );
+    });
+    return Promise.race([promise, guard]).finally(() => clearTimeout(timer));
+  }
+
+  /**
+   * Configdagi kamchilikni topadi.
+   * @param {object} cfg
+   * @returns {?string}
+   */
+  function configProblem(cfg) {
+    if (!cfg || typeof cfg !== 'object') return 'FIREBASE_CONFIG eksport qilinmagan';
+    const missing = ['apiKey', 'authDomain', 'projectId', 'appId'].filter((k) => !cfg[k]);
+    if (missing.length) return `to'ldirilmagan maydonlar: ${missing.join(', ')}`;
+    const ph = Object.entries(cfg)
+      .filter(([, v]) => /^(FIREBASE_|YOUR_)/.test(String(v)))
+      .map(([k]) => k);
+    return ph.length ? `placeholder qiymat qolgan: ${ph.join(', ')}` : null;
+  }
+
+  /**
+   * Ilovaning localStorage holatidan uid ni oladi (zaxira yo'l).
+   * @returns {?string}
+   */
+  function uidFromApp() {
+    try {
+      const raw = localStorage.getItem('pizza.state.v1');
+      if (!raw) return null;
+      const state = JSON.parse(raw);
+      return state && state.user && state.user.uid ? state.user.uid : null;
+    } catch (e) {
+      return null;
+    }
+  }
+
+  /**
+   * Firebase sessiyasidan joriy foydalanuvchini kutadi.
+   * Sessiya bo'lmasa null qaytaradi — sahifa yiqilmaydi.
+   * @param {object} auth
+   * @param {object} sdk
+   * @returns {Promise<?object>}
+   */
+  function currentUser(auth, sdk) {
+    return new Promise((resolve) => {
+      const timer = setTimeout(() => resolve(auth.currentUser || null), TIMEOUT.auth);
+      const off = sdk.onAuthStateChanged(auth, (user) => {
+        clearTimeout(timer);
+        off();
+        resolve(user || null);
+      });
+    });
+  }
+
+  /** Konfiguratsiya va Firebase'ni tayyorlaydi. */
+  async function boot() {
+    log('config.js o\'qilmoqda (kesh chetlab o\'tiladi)...', 'muted');
+    try {
+      // Kesh chetlab o'tiladi: SW config.js ni keshlamaydi, lekin
+      // brauzer moduli keshini ham chetlab o'tamiz
+      cfgModule = await withTimeout(
+        import(`../js/config.js?nocache=${Date.now()}`),
+        TIMEOUT.fetch,
+        'config.js'
+      );
+    } catch (e) {
+      log(`config.js yuklanmadi: ${e.message}`, 'err');
+      return;
+    }
+
+    const cfg = cfgModule.FIREBASE_CONFIG;
+    const problem = configProblem(cfg);
+    const projectEl = document.getElementById('infoProject');
+    projectEl.textContent = (cfg && cfg.projectId) || '—';
+    projectEl.className = problem ? 'bad' : 'good';
+
+    if (problem) {
+      log(`config.js muammosi: ${problem}`, 'err');
+      return;
+    }
+    log(`Loyiha: ${cfg.projectId}`, 'ok');
+
+    log('Firebase SDK yuklanmoqda...', 'muted');
+    let fb;
+    try {
+      fb = await withTimeout(cfgModule.getFirebase(), TIMEOUT.sdk, 'Firebase SDK');
+    } catch (e) {
+      log(`Firebase yuklanmadi: ${e.message}`, 'err');
+      return;
+    }
+    firestore = fb;
+    log('Firebase tayyor', 'ok');
+
+    // uid: avval haqiqiy sessiya, keyin localStorage
+    const user = await currentUser(fb.auth, fb.sdk);
+    const authEl = document.getElementById('infoAuth');
+    if (user) {
+      authEl.textContent = user.phoneNumber || user.uid;
+      authEl.className = 'good';
+      uidInput.value = user.uid;
+      log(`Sessiya topildi: ${user.uid}`, 'ok');
+    } else {
+      const fallback = uidFromApp();
+      authEl.textContent = fallback ? 'localStorage (sessiya yo\'q)' : 'yo\'q';
+      authEl.className = 'bad';
+      if (fallback) uidInput.value = fallback;
+      log(
+        fallback
+          ? 'Firebase sessiyasi topilmadi, uid localStorage dan olindi'
+          : 'Sessiya ham, saqlangan uid ham yo\'q — uid ni qo\'lda kiriting',
+        'warn'
+      );
+    }
+
+    syncUid();
+    if (uidInput.value) readRole();
+  }
+
+  /** uid maydoni bo'yicha tugmalarni yoqadi. */
+  function syncUid() {
+    const uid = uidInput.value.trim();
+    document.getElementById('infoUid').textContent = uid || '—';
+    const ready = Boolean(firestore && uid);
+    writeBtn.disabled = !ready;
+    readBtn.disabled = !ready;
+  }
+
+  /** Mavjud `staff/{uid}` hujjatini o'qiydi. */
+  async function readRole() {
+    const uid = uidInput.value.trim();
+    if (!firestore || !uid) return;
+    const roleEl = document.getElementById('infoRole');
+    try {
+      const { dbx, sdk } = firestore;
+      const snap = await withTimeout(
+        sdk.getDoc(sdk.doc(dbx, 'staff', uid)),
+        TIMEOUT.write,
+        'staff o\'qish'
+      );
+      if (!snap.exists()) {
+        roleEl.textContent = 'yo\'q';
+        roleEl.className = '';
+        log('staff hujjati hali yaratilmagan', 'warn');
+        return;
+      }
+      const data = snap.data();
+      roleEl.textContent = `${data.role}${data.active === false ? ' (o\'chirilgan)' : ''}`;
+      roleEl.className = data.active === false ? 'bad' : 'good';
+      log(`Mavjud rol: ${data.role}`, 'ok');
+      if (data.role) roleInput.value = data.role;
+      if (data.name) nameInput.value = data.name;
+    } catch (e) {
+      roleEl.textContent = 'o\'qilmadi';
+      roleEl.className = 'bad';
+      log(`staff o'qilmadi: ${e.message}`, 'err');
+    }
+  }
+
+  /** `staff/{uid}` hujjatini yozadi. */
+  async function writeRole() {
+    const uid = uidInput.value.trim();
+    const role = roleInput.value;
+    const name = nameInput.value.trim() || 'Admin';
+    if (!firestore || !uid) return;
+
+    if (!window.confirm(`Rostdan yozilsinmi?\n\nstaff/${uid}\nrol: ${role}`)) {
+      log('Bekor qilindi', 'muted');
+      return;
+    }
+
+    writeBtn.disabled = true;
+    try {
+      const { dbx, sdk } = firestore;
+      await withTimeout(
+        sdk.setDoc(
+          sdk.doc(dbx, 'staff', uid),
+          {
+            role,
+            name,
+            // Bo'sh ro'yxat = barcha filiallar (SPEC 2-bo'lim)
+            branchIds: [],
+            active: true,
+            createdAt: new Date().toISOString()
+          },
+          { merge: true }
+        ),
+        TIMEOUT.write,
+        'staff yozish'
+      );
+      log(`staff/${uid} yozildi — rol: ${role}`, 'ok');
+      log('Endi admin panelni oching: ../admin/', 'ok');
+      await readRole();
+    } catch (e) {
+      log(`Yozilmadi: ${e.message}`, 'err');
+      if (String(e.code) === 'permission-denied') {
+        log('Firestore qoidalari staff ga yozishni to\'sdi (8-bosqich qoidalari qo\'yilgan)', 'warn');
+      }
+    } finally {
+      writeBtn.disabled = false;
+    }
+  }
+
+  /** Service worker va keshlarni tozalaydi. */
+  async function clearCaches() {
+    try {
+      if ('serviceWorker' in navigator) {
+        const regs = await navigator.serviceWorker.getRegistrations();
+        await Promise.all(regs.map((r) => r.unregister()));
+        log(`${regs.length} ta service worker o'chirildi`, 'ok');
+      }
+      if (window.caches) {
+        const keys = await caches.keys();
+        await Promise.all(keys.map((k) => caches.delete(k)));
+        log(`${keys.length} ta kesh o'chirildi`, 'ok');
+      }
+      log('Sahifani yangilang (Cmd/Ctrl + Shift + R)', 'warn');
+    } catch (e) {
+      log(`Tozalashda xato: ${e.message}`, 'err');
+    }
+  }
+
+  uidInput.addEventListener('input', syncUid);
+  writeBtn.addEventListener('click', writeRole);
+  readBtn.addEventListener('click', readRole);
+  clearBtn.addEventListener('click', clearCaches);
+
+  boot();
+</script>
+</body>
+</html>

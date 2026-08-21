@@ -3,12 +3,16 @@
 > Har seans boshida shu faylni o'qi. Faqat "Joriy bosqich" deb belgilangan
 > ishni bajar. Boshqa bosqichlarga o'tma. Tugagach shu faylni yangila.
 
-**Joriy bosqich: 7**
+**Joriy bosqich: 8**
 
-> Qoldirilgan ish: Payme/Click to'lov integratsiyasi (SPEC 4.2) —
-> foydalanuvchi qarori bilan keyinga surildi. Qo'shilganda
-> `server/src/orders.js` dagi `PAYMENT_METHODS`, `js/config.js` dagi
-> `APP.paymentMethods` va webhook yo'llari birga kengaytiriladi.
+> Qoldirilgan ishlar:
+> 1. Payme/Click to'lov integratsiyasi (SPEC 4.2) — foydalanuvchi qarori
+>    bilan keyinga surildi. Qo'shilganda `server/src/orders.js` dagi
+>    `PAYMENT_METHODS`, `js/config.js` dagi `APP.paymentMethods` va
+>    webhook yo'llari birga kengaytiriladi.
+> 2. Admin panelning qolgan bo'limlari (SPEC 116–121): banner CRUD,
+>    mijozlar bazasi va qora ro'yxat, broadcast, sozlamalar, audit log.
+> 3. Kuryer ilovasi (SPEC 122–128).
 
 ---
 
@@ -485,12 +489,86 @@ Izoh:
 ---
 
 ## Bosqich 7 — admin va KDS
-Status: boshlanmagan
+Status: **bajarildi**
 
 `admin/` — alohida PWA
 - Buyurtmalar oqimi, KDS, menyu CRUD, filial CRUD, promokod, hisobot
 
 Izoh:
+- `admin/` alohida PWA sifatida yozildi: o'z `index.html`, `manifest.json`,
+  `sw.js` va `css/admin.css`. GitHub Pages'da `/pizza-pwa/admin/`.
+  Desktop-birinchi (xodim kompyuterda ishlaydi), 900px dan pastda chap
+  menyu siljib chiqadigan panelga aylanadi.
+- **Kirish va rollar (SPEC 104):** OTP mijoz ilovasidagi bilan bir xil
+  yo'ldan ketadi, keyin `staff/{uid}` tekshiriladi — hujjat yo'q yoki
+  `active: false` bo'lsa sessiya darhol yopiladi. Rollar:
+  `superadmin`/`manager` — hammasi, `operator` — boshqaruv/buyurtma/KDS,
+  `kitchen` — faqat KDS, `courier` — panelga kirolmaydi.
+  Bu tekshiruv INTERFEYSNI yopadi; haqiqiy himoya 8-bosqichdagi
+  Firestore qoidalari bilan qo'yiladi.
+- **Servisda rol tekshiruvi:** `requireStaff(roles)` qo'shildi —
+  `staff/{uid}` hujjatidan rol o'qiydi. `ADMIN_UIDS` bootstrap yo'li
+  bo'lib qoladi (`staff` bo'sh bo'lganda ham servisni boshqarish uchun).
+  Yangi yo'l: `PATCH /api/orders/:id/courier` (SPEC 110), status yo'li
+  esa endi `reason` (SPEC 107) va `etaMinutes` (SPEC 108) qabul qiladi —
+  tayyorlanish vaqti kafolat muddatini ham suradi.
+- **Buyurtmalar oqimi (SPEC 106):** `onSnapshot` bilan real vaqt, yangi
+  buyurtmada ovoz signali (WebAudio bilan generatsiya qilinadi — audio
+  fayl yuklanmaydi), status filtri, kutish vaqti va kafolat kechikishi
+  belgisi. Har bir amal servis orqali ketadi: client `orders` ga yoza
+  olmaydi.
+- **KDS (SPEC 109):** kartochka + har soniyada sanaydigan taymer +
+  "Tayyor". Taymer butun ro'yxatni qayta chizmaydi, faqat matnni
+  yangilaydi — aks holda tugmalar har soniyada "sakrardi".
+- **Menyu CRUD (SPEC 111):** `menu/current` BITTA hujjat bo'lgani uchun
+  tahrirlash xotirada to'planadi va "Chop etish" bosilganda bir marta
+  yoziladi (aks holda mijozlar yarim tayyor menyuni ko'rardi), versiya
+  avtomatik oshadi. Rasm YUKLANMAYDI — Storage bepul planda yo'q,
+  shuning uchun rasm manzillari qo'lda kiritiladi.
+- **Filial CRUD (SPEC 112–114):** filial, zona polygonlari va stop-list.
+  Polygon `lat, lng` qatorlari ko'rinishida tahrirlanadi va saqlashdan
+  oldin `[{lat, lng}]` ga aylantiriladi; 3 tadan kam yoki buzuq nuqta
+  bo'lsa saqlanmaydi va sabab aytiladi.
+- **Promokod CRUD (SPEC 115):** hujjat ID = kodning o'zi (servis shunday
+  o'qiydi), shuning uchun kod yaratilgandan keyin o'zgartirilmaydi.
+  Yangi kod yaratishda takrorlanish tekshiriladi.
+- **Hisobot (SPEC 118):** `reports/{YYYY-MM-DD}` (cron yozadi) va bugungi
+  kun jonli hisoblanadi. Diagramma Chart.js O'RNIGA inline SVG bilan
+  chizildi — CDN qo'shimcha ishlamay qolish nuqtasi bo'lardi, kerak
+  bo'lgani esa oddiy ustunlar.
+- **Keshlash:** `admin/sw.js` TARMOQ BIRINCHI (xodim eski kod bilan
+  ishlab qolmasin), ildizdagi `sw.js` esa `/admin/` yo'lini chetlab
+  o'tadi — uning scope'i kengroq bo'lgani uchun admin fayllarini
+  "stale-while-revalidate" bilan keshlab qo'yishi mumkin edi.
+  Ildizdagi `VERSION = 'v10'`.
+- `tools/seed-staff.html` yozildi: joriy uid ga rol beradi (standart
+  `superadmin`). uid Firebase sessiyasidan olinadi, sessiya bo'lmasa
+  `localStorage` dan; qo'lda ham kiritish mumkin. Mavjud rolni o'qiydi,
+  yozishdan oldin tasdiq so'raydi, `permission-denied` bo'lsa sababini
+  aytadi.
+- Bir HAQIQIY bug topildi va tuzatildi: `.boot`/`.admin` uslublaridagi
+  `display: grid` brauzerning `[hidden] { display: none }` qoidasini
+  bosib ketardi — yashirilgan yuklanish qatlami ekranni to'sib turardi
+  va bosishlar unga tushardi. `[hidden] { display: none !important }`
+  qo'shildi.
+- Tekshirildi (Chromium 1280×900, soxta Firestore va soxta auth,
+  `page.route` bilan to'xtatilgan API) — 45 ta tekshiruv o'tdi:
+  sessiyasiz kirish ekrani → OTP → panel; rol bo'yicha bo'limlar
+  (superadmin 7 ta, kitchen 1 ta va to'g'ridan-to'g'ri KDS ga tushdi,
+  kuryer/o'chirilgan xodim/staff hujjatisiz — kirolmadi); dashboard
+  ko'rsatkichlari; oqimda faqat faol buyurtmalar, yangisi ajratilgan,
+  nomlar `[object Object]` emas; qabul qilishda `etaMinutes: 40`,
+  rad etishda sabab yuborildi; kuryer ro'yxatida faqat smenadagi;
+  KDS taymeri sanadi va keyingi bosqich yuborildi; menyuda yangi
+  mahsulot qo'shilib versiya 7→8 bo'lib yozildi, narxsiz mahsulot rad
+  etildi; polygon obyekt formatida saqlandi, kam nuqtali rad etildi;
+  promokod katta harfga o'tdi, takrori rad etildi; hisobot jadvali,
+  diagrammasi va bugungi jonli qatori; oqim xatosi ekranda ko'rindi.
+  Konsolda xato yo'q.
+- Bu bosqichda YOZILMAGANI (SPEC 116–121, keyingi bosqichlarga):
+  banner CRUD, mijozlar bazasi va qora ro'yxat, broadcast xabar,
+  sozlamalar ekrani, audit log. Kuryer ilovasi (SPEC 122–128) ham
+  alohida — admin panelda kuryer uchun bo'lim yo'q.
 
 ---
 

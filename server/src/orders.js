@@ -628,10 +628,15 @@ function sanitizeAddress(address) {
 /**
  * Buyurtma statusini o'zgartiradi (admin/kuryer uchun).
  *
- * @param {{orderId: string, status: string, by: string}} input
+ * `reason` — rad etish sababi (SPEC 107), mijozga xabarda ko'rsatiladi.
+ * `etaMinutes` — operator belgilagan tayyorlanish vaqti (SPEC 108);
+ * u kafolat muddatini ham suradi.
+ *
+ * @param {{orderId: string, status: string, by: string,
+ *          reason?: string, etaMinutes?: number}} input
  * @returns {Promise<{status: string}>}
  */
-export async function updateStatus({ orderId, status, by }) {
+export async function updateStatus({ orderId, status, by, reason, etaMinutes }) {
   if (!STATUSES.includes(status) && status !== 'cancelled') {
     throw httpError(400, 'bad-status', 'Status noto\'g\'ri');
   }
@@ -658,6 +663,20 @@ export async function updateStatus({ orderId, status, by }) {
     // Kafolat buzilganmi — cron ulgurmagan bo'lsa shu yerda ham tekshiriladi
     const deadline = order.guaranteeDeadline?.toMillis?.() ?? 0;
     if (deadline && Date.now() > deadline) patch.guaranteeBroken = true;
+  }
+
+  if (status === 'cancelled' && reason) {
+    patch.cancelReason = String(reason).slice(0, 200);
+  }
+
+  // Operator tayyorlanish vaqtini belgilaganda kafolat muddati ham suriladi
+  const eta = Math.floor(Number(etaMinutes) || 0);
+  if (status === 'accepted' && eta > 0 && eta <= 240) {
+    patch.etaMinutes = eta;
+    patch.guaranteeDeadline = Timestamp.fromMillis(Date.now() + eta * 60000);
+    // Yangi muddat qo'yildi — kafolat qaytadan hisoblanadi
+    patch.guaranteeBroken = false;
+    patch.guaranteeClosed = false;
   }
 
   const batch = db.batch();
@@ -698,4 +717,60 @@ export async function updateStatus({ orderId, status, by }) {
   notifyStatus(order, status, userSnap.data()?.telegramId).catch(() => {});
 
   return { status };
+}
+
+/**
+ * Buyurtmaga kuryer tayinlaydi (SPEC 110). Status o'zgarmaydi —
+ * kuryer "Oldim" deganda status alohida yangilanadi.
+ *
+ * @param {{orderId: string, courierId: string, by: string}} input
+ * @returns {Promise<{courierId: string, courierName: ?string}>}
+ */
+export async function assignCourier({ orderId, courierId, by }) {
+  const id = String(courierId || '').trim();
+  if (!id) throw httpError(400, 'no-courier', 'Kuryer tanlanmagan');
+
+  const db = await getDb();
+  const { FieldValue, Timestamp } = await getFieldTypes();
+
+  const orderRef = db.collection('orders').doc(orderId);
+  const courierRef = db.collection('couriers').doc(id);
+  const [orderSnap, courierSnap] = await Promise.all([orderRef.get(), courierRef.get()]);
+
+  if (!orderSnap.exists) throw httpError(404, 'no-order', 'Buyurtma topilmadi');
+  if (!courierSnap.exists) throw httpError(404, 'no-courier', 'Kuryer topilmadi');
+
+  const order = orderSnap.data();
+  if (order.status === 'delivered' || order.status === 'cancelled') {
+    throw httpError(409, 'order-closed', 'Buyurtma yopilgan');
+  }
+  if (order.type === 'pickup') {
+    throw httpError(400, 'pickup-order', 'Olib ketish buyurtmasiga kuryer kerak emas');
+  }
+
+  const courier = courierSnap.data();
+
+  const batch = db.batch();
+  batch.update(orderRef, {
+    courierId: id,
+    courierName: courier.name ?? null,
+    courierPhone: courier.phone ?? null,
+    // Kuryer joylashuvi bo'lsa darhol ko'rsatiladi, keyin o'zi yangilaydi
+    courierLocation: courier.location ?? null,
+    assignedAt: Timestamp.now(),
+    assignedBy: by
+  });
+  batch.set(courierRef, {
+    activeOrders: FieldValue.arrayUnion(orderId)
+  }, { merge: true });
+
+  // Oldingi kuryer bo'lsa uning ro'yxatidan olib tashlanadi
+  if (order.courierId && order.courierId !== id) {
+    batch.set(db.collection('couriers').doc(order.courierId), {
+      activeOrders: FieldValue.arrayRemove(orderId)
+    }, { merge: true });
+  }
+
+  await batch.commit();
+  return { courierId: id, courierName: courier.name ?? null };
 }
