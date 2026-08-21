@@ -232,6 +232,16 @@ Izoh:
   `YANDEX_MAPS_LANG`, `DEFAULT_CENTER` (Toshkent).
 - `sw.js` `VERSION = 'v5'`, `address.js` app shell ro'yxatida. Xarita
   skripti tashqi domendan kelgani uchun SW unga tegmaydi.
+- **Geokoder tuzatishi.** Xarita ishlaganda ham manzil "Manzil aniqlanmadi"
+  bo'lib qolardi. Sabab: `try/catch` HAR QANDAY xatoni (403 ham, kod
+  xatosi ham) bitta jim matnga aylantirardi. Endi: har bosqich konsolga
+  yoziladi (`[geocode]` chaqiruv → javob → manzil qatori), xato turi
+  aniqlanadi (403 / limit / boshqa) va ekranda ogohlantirish chiqadi;
+  geokoder ishlamasa maydonga koordinata yoziladi va qo'lda tahrirlash
+  ochiq qoladi (avval map rejimida yozilgan matn e'tiborga olinmasdi —
+  bu ham tuzatildi). 403 dan keyin qayta urinilmaydi. `firstGeoObject()`
+  javob shakliga bog'liq emas: `getLength()` bo'lmasa ham ishlaydi.
+  Zona tekshiruvi geokoderga bog'liq emas — koordinatadan hisoblanadi.
 - Bu bosqichda qilinmadi: joylashuvni avtomatik aniqlash tugmasi
   (`geolocationControl` xaritaning o'zida bor), manzilni xarita ustida
   ko'rsatuvchi doimiy pin animatsiyasi, filiallarni masofa bo'yicha

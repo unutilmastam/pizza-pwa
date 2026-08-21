@@ -207,6 +207,20 @@ export function render() {
     el('div.map__loading', { text: t('app.loading') })
   ]);
 
+  /** Xarita/geokoder muammolari shu yerda KO'RINADI, jim qolmaydi. */
+  const notice = el('p.map-notice', {
+    attrs: { hidden: 'hidden', role: 'status', 'aria-live': 'polite' }
+  });
+
+  /**
+   * Ekrandagi ogohlantirishni ko'rsatadi yoki yashiradi.
+   * @param {?string} text - bo'sh bo'lsa yashiriladi
+   */
+  function showNotice(text) {
+    notice.textContent = text || '';
+    notice.hidden = !text;
+  }
+
   const zoneBox = el('div.zone-info');
   const details = detailsForm(current || {});
   const savedBox = el('section.saved-addr');
@@ -217,7 +231,14 @@ export function render() {
   });
   const cta = el('div.cart-cta', {}, [confirmBtn]);
 
-  root.append(head, searchBox, mapBox, zoneBox, details.node, savedBox, cta);
+  root.append(head, searchBox, mapBox, notice, zoneBox, details.node, savedBox, cta);
+
+  // Qidiruv maydoni HAR DOIM qo'lda tahrirlanadi: geokoder ishlamasa ham
+  // (yoki noto'g'ri manzil qaytarsa ham) foydalanuvchi o'zi yozib qo'yadi.
+  searchInput.addEventListener('input', () => {
+    picked.address = searchInput.value.trim();
+    renderZone();
+  });
 
   /** Tanlangan nuqta va aniqlangan ma'lumot. */
   const picked = {
@@ -373,11 +394,12 @@ export function render() {
   })();
 
   // --- xarita (dangasa)
-  initMap({ mapBox, searchInput, picked, setPoint, root });
+  initMap({ mapBox, searchInput, picked, setPoint, showNotice, root });
 
   // --- saqlash
   confirmBtn.addEventListener('click', async () => {
-    if (!picked.address) {
+    // "Aniqlanmoqda..." — bu manzil emas, uni saqlab bo'lmaydi
+    if (!picked.address || picked.address === t('address.detecting')) {
       toast(t('checkout.addressRequired'), { type: 'error' });
       return;
     }
@@ -420,12 +442,72 @@ export function render() {
 }
 
 /**
+ * Geokoder xatosini odam o'qiydigan sababga aylantiradi.
+ *
+ * Yandex'da xarita ko'rsatish (JS API) va geokodlash (Geocoder API)
+ * ALOHIDA ruxsatlar: kalitda Geokoder yoqilmagan bo'lsa xarita ishlaydi,
+ * lekin `ymaps.geocode()` 403 qaytaradi.
+ *
+ * @param {*} error
+ * @returns {{code: string, message: string}}
+ */
+export function describeGeocodeError(error) {
+  const raw = [
+    error && error.message,
+    error && error.statusText,
+    error && error.status,
+    error && error.code
+  ].filter(Boolean).join(' ');
+
+  if (/403|forbidden|apikey|api key|invalid key|not authorized/i.test(raw)) {
+    return { code: 'forbidden', message: t('address.geocodeForbidden') };
+  }
+  if (/429|limit|quota/i.test(raw)) {
+    return { code: 'limit', message: t('address.geocodeLimit') };
+  }
+  return { code: 'unknown', message: t('address.geocodeError') };
+}
+
+/**
+ * Geokoder javobidan birinchi obyektni oladi.
+ *
+ * Javob shakli SDK versiyasiga qarab farq qilishi mumkin, shuning uchun
+ * `getLength()` bo'lmasa ham ishlaydi — aks holda kutilmagan `TypeError`
+ * "manzil topilmadi" ga aylanib ketadi va sabab yashirin qoladi.
+ *
+ * @param {object} res - `ymaps.geocode()` natijasi
+ * @returns {?object}
+ */
+function firstGeoObject(res) {
+  const objects = res && res.geoObjects;
+  if (!objects || typeof objects.get !== 'function') {
+    console.warn('[geocode] javobda geoObjects yo\'q:', res);
+    return null;
+  }
+  const count = typeof objects.getLength === 'function' ? objects.getLength() : null;
+  console.log('[geocode] javob keldi, obyektlar:', count === null ? '(soni nomalum)' : count);
+  if (count === 0) return null;
+  return objects.get(0) || null;
+}
+
+/**
+ * Koordinatani `41.31108, 69.24056` ko'rinishida beradi —
+ * geokoder ishlamaganda inputga shu yoziladi, kuryer uchun ham yetarli.
+ * @param {number} lat
+ * @param {number} lng
+ * @returns {string}
+ */
+function coordsLabel(lat, lng) {
+  return `${Number(lat).toFixed(5)}, ${Number(lng).toFixed(5)}`;
+}
+
+/**
  * Xaritani yuklaydi va ishga tushiradi. Xato bo'lsa qo'lda kiritish rejimi.
  * @param {{mapBox: HTMLElement, searchInput: HTMLElement, picked: object,
- *          setPoint: Function, root: HTMLElement}} ctx
+ *          setPoint: Function, showNotice: Function, root: HTMLElement}} ctx
  */
 async function initMap(ctx) {
-  const { mapBox, searchInput, picked, setPoint } = ctx;
+  const { mapBox, searchInput, picked, setPoint, showNotice } = ctx;
 
   let ymaps;
   try {
@@ -454,49 +536,93 @@ async function initMap(ctx) {
     map.geoObjects.add(pin);
     map.__pin = pin;
 
+    /** Geokoder ruxsati yo'qligi bir marta aniqlangach qayta urinilmaydi. */
+    let geocoderBlocked = false;
+
     /**
      * Nuqtani teskari geokodlaydi (koordinata → matn).
+     *
+     * Har bosqich konsolga yoziladi: chaqiruv, javob, topilgan obyektlar
+     * soni va manzil qatori. Shu bilan "javob kelmadi" va "javob keldi,
+     * lekin o'qilmadi" holatlarini ajratish mumkin.
+     *
      * @param {[number, number]} coords
      */
     const reverse = debounce(async (coords) => {
+      if (geocoderBlocked) {
+        // Kalitda geokoder yo'q — koordinatani ko'rsatamiz, qo'lda yoziladi
+        setPoint(coords[0], coords[1], coordsLabel(coords[0], coords[1]));
+        return;
+      }
+
+      console.log('[geocode] chaqiruv:', coords);
       try {
         const res = await ymaps.geocode(coords, { results: 1 });
-        const first = res.geoObjects.get(0);
-        setPoint(coords[0], coords[1], first ? first.getAddressLine() : t('address.notFound'));
+        const first = firstGeoObject(res);
+        const line = first && typeof first.getAddressLine === 'function'
+          ? first.getAddressLine()
+          : '';
+        console.log('[geocode] manzil qatori:', JSON.stringify(line));
+
+        if (line) {
+          showNotice(null);
+          setPoint(coords[0], coords[1], line);
+        } else {
+          // Javob bor, lekin manzil yo'q (masalan, dala o'rtasi)
+          showNotice(t('address.notFound'));
+          setPoint(coords[0], coords[1], coordsLabel(coords[0], coords[1]));
+        }
       } catch (e) {
-        console.warn('Reverse geocode xatosi:', e);
-        setPoint(coords[0], coords[1], t('address.notFound'));
+        const info = describeGeocodeError(e);
+        console.error('[geocode] XATO:', info.code, e);
+        if (info.code === 'forbidden') geocoderBlocked = true;
+        showNotice(info.message);
+        setPoint(coords[0], coords[1], coordsLabel(coords[0], coords[1]));
       }
     }, 400);
 
-    pin.events.add('dragend', () => {
-      const coords = pin.geometry.getCoordinates();
-      setPoint(coords[0], coords[1]);
-      reverse(coords);
-    });
-
-    map.events.add('click', (e) => {
-      const coords = e.get('coords');
+    /**
+     * Marker yangi nuqtaga qo'yilganda: zona darhol yangilanadi,
+     * manzil matni esa geokoderdan keladi.
+     * @param {[number, number]} coords
+     */
+    const movePin = (coords) => {
       pin.geometry.setCoordinates(coords);
-      setPoint(coords[0], coords[1]);
+      setPoint(coords[0], coords[1], t('address.detecting'));
       reverse(coords);
-    });
+    };
+
+    pin.events.add('dragend', () => movePin(pin.geometry.getCoordinates()));
+    map.events.add('click', (e) => movePin(e.get('coords')));
 
     // Autocomplete
     try {
       const suggest = new ymaps.SuggestView(searchInput, { results: 5 });
       suggest.events.add('select', async (e) => {
         const value = e.get('item').value;
+        console.log('[geocode] tanlangan tavsiya:', value);
         try {
           const res = await ymaps.geocode(value, { results: 1 });
-          const first = res.geoObjects.get(0);
-          if (!first) return;
+          const first = firstGeoObject(res);
+          if (!first) {
+            console.warn('[geocode] tavsiya bo\'yicha nuqta topilmadi');
+            showNotice(t('address.notFound'));
+            // Matn baribir foydali — uni manzil sifatida qoldiramiz
+            picked.address = value;
+            return;
+          }
           const coords = first.geometry.getCoordinates();
+          console.log('[geocode] tavsiya koordinatasi:', coords);
+          showNotice(null);
           map.setCenter(coords, 17);
           pin.geometry.setCoordinates(coords);
-          setPoint(coords[0], coords[1], first.getAddressLine());
+          setPoint(coords[0], coords[1], first.getAddressLine() || value);
         } catch (err) {
-          console.warn('Geokodlash xatosi:', err);
+          const info = describeGeocodeError(err);
+          console.error('[geocode] tavsiyani geokodlash XATOSI:', info.code, err);
+          showNotice(info.message);
+          // Koordinata aniqlanmadi, lekin foydalanuvchi yozgan matn qoladi
+          picked.address = value;
         }
       });
       cleanup.push(() => suggest.destroy && suggest.destroy());
@@ -506,7 +632,10 @@ async function initMap(ctx) {
     }
 
     // Ochilishda manzil matni bo'lmasa — aniqlab beramiz
-    if (!picked.address) reverse(center);
+    if (!picked.address) {
+      searchInput.value = t('address.detecting');
+      reverse(center);
+    }
 
     cleanup.push(() => reverse.cancel());
   } catch (e) {
