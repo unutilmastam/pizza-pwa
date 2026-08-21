@@ -137,19 +137,55 @@ export function throttle(fn, wait = 100) {
 }
 
 /**
+ * Nuqtani `[lat, lng]` juftligiga keltiradi.
+ *
+ * Uch xil yozuvni tushunadi:
+ *  - `{lat, lng}` — Firestore'dagi ASOSIY format (u ichma-ich massivni
+ *    qabul qilmaydi, shuning uchun polygon nuqtalari obyekt bo'lishi shart);
+ *  - `[lat, lng]` — Yandex Maps qaytaradigan massiv;
+ *  - `{latitude, longitude}` — Firestore GeoPoint.
+ *
+ * @param {*} value
+ * @returns {?[number, number]}
+ */
+function toLatLng(value) {
+  if (Array.isArray(value)) {
+    const [lat, lng] = value;
+    return Number.isFinite(Number(lat)) && Number.isFinite(Number(lng))
+      ? [Number(lat), Number(lng)]
+      : null;
+  }
+  if (value && typeof value === 'object') {
+    const lat = value.lat ?? value.latitude;
+    const lng = value.lng ?? value.lon ?? value.longitude;
+    return Number.isFinite(Number(lat)) && Number.isFinite(Number(lng))
+      ? [Number(lat), Number(lng)]
+      : null;
+  }
+  return null;
+}
+
+/**
  * Nuqta ko'pburchak ichidami — ray casting algoritmi.
  * Yetkazish zonasini tekshirish uchun.
- * @param {[number, number]} point - [lat, lng]
- * @param {Array<[number, number]>} polygon - [[lat, lng], ...]
+ *
+ * @param {[number, number]|{lat: number, lng: number}} point
+ * @param {Array<{lat: number, lng: number}|[number, number]>} polygon
+ *        kamida 3 ta cho'qqi
  * @returns {boolean}
  */
 export function pointInPolygon(point, polygon) {
-  if (!Array.isArray(point) || !Array.isArray(polygon) || polygon.length < 3) return false;
-  const [x, y] = point;
+  const target = toLatLng(point);
+  if (!target || !Array.isArray(polygon) || polygon.length < 3) return false;
+
+  const ring = polygon.map(toLatLng);
+  if (ring.some((p) => p === null)) return false;
+
+  const [x, y] = target;
   let inside = false;
-  for (let i = 0, j = polygon.length - 1; i < polygon.length; j = i++) {
-    const [xi, yi] = polygon[i];
-    const [xj, yj] = polygon[j];
+  for (let i = 0, j = ring.length - 1; i < ring.length; j = i++) {
+    const [xi, yi] = ring[i];
+    const [xj, yj] = ring[j];
     const intersect = (yi > y) !== (yj > y) &&
       x < ((xj - xi) * (y - yi)) / (yj - yi || Number.EPSILON) + xi;
     if (intersect) inside = !inside;

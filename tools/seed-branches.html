@@ -235,9 +235,16 @@
       if (!Array.isArray(zone.polygon) || zone.polygon.length < 3) {
         return `${branch.id} / ${zone.name || '?'}: polygon kamida 3 nuqtadan iborat bo'lsin`;
       }
-      const bad = zone.polygon.find((p) => !Array.isArray(p) || p.length !== 2 ||
-        typeof p[0] !== 'number' || typeof p[1] !== 'number');
-      if (bad) return `${branch.id} / ${zone.name || '?'}: polygon nuqtasi [lat, lng] emas`;
+      // Firestore ichma-ich massivni qabul qilmaydi ("Nested arrays are not
+      // supported"), shuning uchun har nuqta {lat, lng} obyekti bo'lishi shart
+      const nested = zone.polygon.find((p) => Array.isArray(p));
+      if (nested) {
+        return `${branch.id} / ${zone.name || '?'}: polygon nuqtasi massiv — ` +
+          `Firestore ichma-ich massivni qabul qilmaydi, {lat, lng} obyekti bo'lsin`;
+      }
+      const bad = zone.polygon.find((p) => !p || typeof p !== 'object' ||
+        typeof p.lat !== 'number' || typeof p.lng !== 'number');
+      if (bad) return `${branch.id} / ${zone.name || '?'}: polygon nuqtasi {lat, lng} emas`;
       if (typeof zone.deliveryPrice !== 'number' || typeof zone.minOrder !== 'number') {
         return `${branch.id} / ${zone.name || '?'}: deliveryPrice yoki minOrder raqam emas`;
       }

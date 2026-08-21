@@ -205,7 +205,9 @@ menu/current
 branches/{branchId}
   { name, address, lat, lng, phone,
     workHours: {open:"10:00", close:"23:00"},
-    zones: [ {polygon:[[lat,lng],...], deliveryPrice, minOrder, etaMinutes} ],
+    zones: [ {name, polygon:[{lat,lng},...], deliveryPrice, minOrder, etaMinutes} ],
+    // DIQQAT: polygon nuqtalari OBYEKT — Firestore ichma-ich massivni
+    // qabul qilmaydi ("Nested arrays are not supported")
     stopList: ["productId1","variantId2"],
     priceOverrides: { "variantId": 52000 },
     active }
