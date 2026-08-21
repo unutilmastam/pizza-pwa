@@ -25,23 +25,30 @@ export const FIREBASE_SDK = {
   firestore: 'https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js'
 };
 
-/** Node servis (Render) bazaviy manzili. */
+/**
+ * Node servis (Render) bazaviy manzili — barcha API chaqiruvlari shundan
+ * boshlanadi. Servis manzili faqat shu yerda yoziladi; `js/api.js` uni
+ * o'qiydi, boshqa fayllar `fetch` qilmaydi.
+ *
+ * Render'da servis nomi boshqacha bo'lsa shu qatorni almashtiring.
+ */
 export const API_BASE = 'https://pizza-api.onrender.com';
 
 /**
  * Autentifikatsiya rejimi.
  *
- *  - `test`       — Node servis hali yo'q. SMS yuborilmaydi, kod
- *                   `TEST_OTP_CODE` bilan solishtiriladi, sessiya
- *                   `signInAnonymously()` orqali ochiladi va telefon
- *                   `users/{uid}` hujjatiga yoziladi.
- *  - `production` — 6-bosqichda yoqiladi: `/api/auth/send-otp` va
- *                   `/api/auth/verify-otp`, so'ng `signInWithCustomToken()`.
+ *  - `production` — ISHLAYOTGAN rejim: `/api/auth/send-otp` va
+ *                   `/api/auth/verify-otp` chaqiriladi, servis qaytargan
+ *                   custom token bilan `signInWithCustomToken()`.
+ *  - `test`       — Node servis mavjud bo'lmagan paytdagi zaxira yo'l:
+ *                   SMS yuborilmaydi, kod `TEST_OTP_CODE` bilan
+ *                   solishtiriladi, sessiya `signInAnonymously()` orqali
+ *                   ochiladi.
  *
  * Rejimni almashtirish uchun shu qiymatni o'zgartirish yetarli —
  * `js/auth.js` ikkala yo'lni ham biladi.
  */
-export const AUTH_MODE = 'test';
+export const AUTH_MODE = 'production';
 
 /** Test rejimidagi yagona to'g'ri kod. Ekranda ham shu ko'rsatiladi. */
 export const TEST_OTP_CODE = '000000';
@@ -114,8 +121,16 @@ export const APP = {
     minLeadMinutes: 30
   },
 
-  /** To'lov usullari — 6-bosqichda Payme/Click/Uzum redirect qo'shiladi. */
-  paymentMethods: ['cash', 'card', 'payme', 'click', 'uzum'],
+  /**
+   * To'lov usullari.
+   *
+   * Hozircha faqat naqd va kuryerdagi karta — ikkalasi ham buyurtmada
+   * BELGI sifatida saqlanadi, ilova pul o'tkazmasi bilan ishlamaydi.
+   * Payme/Click/Uzum onlayn to'lovi keyingi bosqichga qoldirilgan;
+   * ro'yxatga qo'shishdan oldin Node servisda ham `PAYMENT_METHODS`
+   * kengaytirilishi va webhook yozilishi kerak.
+   */
+  paymentMethods: ['cash', 'card'],
 
   /** Idish-tovoq soni chegarasi. */
   maxCutlery: 10,

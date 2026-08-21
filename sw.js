@@ -11,7 +11,7 @@
  * Statik fayl mazmuni o'zgarsa — VERSION ni oshiring.
  */
 
-const VERSION = 'v7';
+const VERSION = 'v8';
 const SHELL_CACHE = `pizza-shell-${VERSION}`;
 const RUNTIME_CACHE = `pizza-runtime-${VERSION}`;
 
@@ -38,6 +38,7 @@ const SHELL_ASSETS = [
   './js/ui.js',
   './js/db.js',
   './js/auth.js',
+  './js/api.js',
   './js/pages/menu.js',
   './js/pages/product.js',
   './js/pages/cart.js',

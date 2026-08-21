@@ -14,13 +14,11 @@
  * chaqiruvlari boshqa joyda yo'q.
  */
 
-import { AUTH_MODE, TEST_OTP_CODE, API_BASE, getFirebase } from './config.js';
+import { AUTH_MODE, TEST_OTP_CODE, getFirebase } from './config.js';
+import { sendOtpRequest, verifyOtpRequest } from './api.js';
 import { ensureUserDoc, getUser } from './db.js';
 import { setUser, getState } from './state.js';
 import { getLang } from './i18n.js';
-
-/** Tarmoq so'rovlari uchun kutish chegarasi (ms). */
-const REQUEST_TIMEOUT = 15000;
 
 /** Auth kuzatuvchisi bir marta ulanadi. */
 let authWatcher = null;
@@ -44,44 +42,18 @@ export function normalizePhone(input) {
 }
 
 /**
- * Node servisga so'rov (faqat production rejimida).
- * @param {string} path
- * @param {object} body
- * @returns {Promise<object>}
- */
-async function apiPost(path, body) {
-  const controller = new AbortController();
-  const timer = setTimeout(() => controller.abort(), REQUEST_TIMEOUT);
-  try {
-    const res = await fetch(`${API_BASE}${path}`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(body),
-      signal: controller.signal
-    });
-    const data = await res.json().catch(() => ({}));
-    if (!res.ok) {
-      const error = new Error(data.message || `HTTP ${res.status}`);
-      error.code = data.code || `http-${res.status}`;
-      throw error;
-    }
-    return data;
-  } finally {
-    clearTimeout(timer);
-  }
-}
-
-/**
  * OTP kodini so'raydi.
  *
  * Test rejimida hech qayerga so'rov ketmaydi — kod har doim
  * `TEST_OTP_CODE`. Production rejimida `/api/auth/send-otp` chaqiriladi.
  *
  * @param {string} phone - `+998901234567`
- * @returns {Promise<{mode: string, testCode?: string}>}
+ * @param {?Function} [onSlow] - servis uyg'onayotganda chaqiriladi
+ * @returns {Promise<{mode: string, testCode?: string, resendAfter?: number}>}
  */
-export async function sendOtp(phone) {
-  if (!normalizePhone(phone)) {
+export async function sendOtp(phone, onSlow = null) {
+  const normalized = normalizePhone(phone);
+  if (!normalized) {
     const error = new Error('Telefon raqam noto\'g\'ri');
     error.code = 'phone-invalid';
     throw error;
@@ -92,8 +64,8 @@ export async function sendOtp(phone) {
     return { mode: 'test', testCode: TEST_OTP_CODE };
   }
 
-  await apiPost('/api/auth/send-otp', { phone });
-  return { mode: 'production' };
+  const data = await sendOtpRequest(normalized, onSlow);
+  return { mode: 'production', resendAfter: data.resendAfter };
 }
 
 /**
@@ -130,7 +102,7 @@ export async function verifyOtp(phone, code) {
     credential = await sdk.signInAnonymously(auth);
     console.log('[auth] anonim sessiya ochildi:', credential.user.uid);
   } else {
-    const { token } = await apiPost('/api/auth/verify-otp', { phone: normalized, code });
+    const { token } = await verifyOtpRequest(normalized, String(code));
     credential = await sdk.signInWithCustomToken(auth, token);
     console.log('[auth] custom token bilan kirildi:', credential.user.uid);
   }
@@ -225,8 +197,22 @@ export async function initAuth() {
  */
 export function authErrorKey(error) {
   const code = String((error && error.code) || '');
-  if (code === 'phone-invalid') return 'auth.phoneInvalid';
+
+  // Client tekshiruvi
+  if (code === 'phone-invalid' || code === 'invalid-phone') return 'auth.phoneInvalid';
   if (code === 'code-invalid' || code === 'code-wrong') return 'auth.codeWrong';
+
+  // Node servis qaytaradigan kodlar
+  if (code === 'wrong-code' || code === 'no-code') return 'auth.codeWrong';
+  if (code === 'expired') return 'auth.codeExpired';
+  if (code === 'too-soon' || code === 'rate-limited' || code === 'too-many-attempts') {
+    return 'auth.tooMany';
+  }
+  if (code === 'blocked') return 'auth.blocked';
+  if (code === 'timeout') return 'auth.serverSlow';
+  if (code === 'network') return 'auth.networkError';
+
+  // Firebase SDK kodlari
   if (code.includes('operation-not-allowed')) return 'auth.anonDisabled';
   if (code.includes('network') || code.includes('unavailable')) return 'auth.networkError';
   if (code.includes('too-many-requests')) return 'auth.tooMany';

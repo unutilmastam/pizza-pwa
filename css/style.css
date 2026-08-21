@@ -1628,6 +1628,19 @@ body:has(.cart-cta) .toasts {
   text-align: center;
 }
 
+/*
+ * Buyurtma yuborilayotgandagi holat matni. Bo'sh bo'lsa joy egallamaydi,
+ * shuning uchun tugma sakramaydi.
+ */
+.cta-note {
+  margin: 0;
+  text-align: center;
+}
+
+.cta-note:empty {
+  display: none;
+}
+
 /* Checkout bo'limlari */
 
 .co-section {

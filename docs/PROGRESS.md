@@ -3,7 +3,12 @@
 > Har seans boshida shu faylni o'qi. Faqat "Joriy bosqich" deb belgilangan
 > ishni bajar. Boshqa bosqichlarga o'tma. Tugagach shu faylni yangila.
 
-**Joriy bosqich: 6**
+**Joriy bosqich: 7**
+
+> Qoldirilgan ish: Payme/Click to'lov integratsiyasi (SPEC 4.2) —
+> foydalanuvchi qarori bilan keyinga surildi. Qo'shilganda
+> `server/src/orders.js` dagi `PAYMENT_METHODS`, `js/config.js` dagi
+> `APP.paymentMethods` va webhook yo'llari birga kengaytiriladi.
 
 ---
 
@@ -392,16 +397,90 @@ Izoh:
 ---
 
 ## Bosqich 6 — Node servis
-Status: **joriy**
+Status: **bajarildi (Payme/Click'siz)**
 
 `server/` — Express + Firebase Admin SDK
 - `/api/auth/send-otp`, `/verify-otp`
 - `/api/orders` — narxni qayta hisoblash
-- `/api/payments/payme`, `/click`
+- ~~`/api/payments/payme`, `/click`~~ — keyingi bosqichga qoldirildi
 - `/api/orders/:id/status`
 - Telegram bot, cron
 
 Izoh:
+- `server/` yozildi: Express 4 + Firebase Admin 12, ESM, Node ≥ 20.
+  Modullar: `config.js` (env), `firebase.js` (dangasa Admin init),
+  `otp.js`, `orders.js`, `telegram.js`, `cron.js`, `geo.js`,
+  `middleware.js` va `index.js`.
+- **To'lov:** Payme/Click YOZILMADI — keyingi bosqichga qoldirildi.
+  Ruxsat etilgan usullar `PAYMENT_METHODS = ['cash', 'card']`
+  (naqd va kuryerdagi karta), ikkalasi ham buyurtmada faqat belgi:
+  `paymentStatus` doim `unpaid`, pul oqimi bilan servis ishlamaydi.
+  `js/config.js` dagi `APP.paymentMethods` ham shu ikkitaga qisqardi.
+- **Maxfiy kalitlar kodda yo'q.** Hammasi `process.env` dan o'qiladi,
+  namuna `server/.env.example` da. Firebase private key `\n` bilan
+  yoziladi va kodda tiklanadi. `checkConfig()` yetishmayotganini
+  ro'yxat qilib beradi, lekin process yiqilmaydi — `/api/health`
+  javob berib, sababni ko'rsatib turadi.
+- **Buyurtma yakunlash** (SPEC 4.1): narx `menu/current` dan qayta
+  hisoblanadi (client narxi butunlay e'tiborga olinmaydi), filial
+  `priceOverrides` va `stopList` qo'llanadi, faqat mahsulotda ro'yxatga
+  olingan qo'shimchalar qabul qilinadi, zona `pointInPolygon` bilan
+  topiladi, minimal summa tekshiriladi, promokod (muddat, limit, per-user,
+  filial, birinchi buyurtma) va bonus serverda hisoblanadi,
+  `orderNumber` esa `counters/orderNumber` ustida transaction bilan
+  beriladi. Buyurtma, bonus yechilishi va promo hisoblagichi bitta
+  batch'da yoziladi.
+- **OTP:** kod Firestore'da (`otps/{phone}`) SHA-256 xesh ko'rinishida
+  saqlanadi — xotirada emas, chunki Render uyqusida process qayta
+  ishga tushadi. Qayta yuborish taymeri, soatlik limit va urinishlar
+  chegarasi bor. SMS provayderi `console` yoki `eskiz`. Tekshiruvdan
+  keyin telefon bo'yicha barqaror uid topiladi va custom token beriladi.
+- **Cron:** kafolat (har daqiqa), bonus kuydirish (har soat), kunlik
+  hisobot. Hammasi holat bayroqlariga tayanadi (`guaranteeClosed`,
+  `expired`), shuning uchun uyqu tufayli o'tkazib yuborilgan yugurish
+  keyin topib bajariladi; servis uyg'onganda `runCatchUp()` darhol bir
+  marta ishlaydi. `POST /api/jobs/:name` bilan admin qo'lda ham
+  yugurtira oladi.
+- Firestore'da `null` timestamp'dan oldin turishi kafolat va bonus
+  so'rovlarida quyi chegara talab qildi — busiz `guaranteeDeadline:
+  null` bo'lgan rejalashtirilgan buyurtmalar "kafolat buzildi" deb
+  belgilanib ketardi.
+- **Render bepul plani:** `/api/health` yengil (Firestore faqat
+  `?deep=1` bilan), `trust proxy` yoqilgan, SIGTERM ushlanadi.
+  Frontend tomonda `js/api.js` da kutish chegarasi 60 sek, 4 sekdan
+  keyin "server uyg'onmoqda" yoziladi, savat/checkout/kirish yo'liga
+  o'tilganda servis fonda uyg'otiladi (`wakeUp()`).
+- **Frontend ulandi:** `AUTH_MODE = 'production'`, yangi `js/api.js`
+  (barcha `fetch` faqat shu yerda, `API_BASE` config.js dan),
+  `auth.js` endi shu qatlamdan foydalanadi va servis bergan
+  `resendAfter` taymerini qo'llaydi, checkout esa `POST /api/orders`
+  ga yuboradi: muvaffaqiyatda savat tozalanadi va `#/order/:id` ga
+  o'tiladi, xatoda savat saqlanib qoladi va sabab aytiladi.
+  Servis qaytargan narx client hisobidan farq qilsa ogohlantiriladi.
+- `sw.js` `VERSION = 'v8'`, `js/api.js` app shell'da.
+- README.md yozildi: Render sozlamalari (Root Directory `server`,
+  build/start buyruqlari, health check yo'li), majburiy va ixtiyoriy
+  env o'zgaruvchilar jadvali, kerakli Firestore composite indekslari,
+  uyqu bilan ishlash va tashqi ping tavsiyasi.
+- Tekshirildi:
+  - `server`: `npm test` — 10 ta test (narx qayta hisoblanishi, filial
+    `priceOverrides`, qo'shimcha narxi, stop-list, nofaol mahsulot,
+    noma'lum variant/qo'shimcha, miqdor chegaralari, olib tashlanadigan
+    ingredient filtri, polygon obyekt formati, `findZone` filial
+    afzalligi, telefon normallashtirish) — hammasi o'tdi.
+  - servis Firebase kalitlarisiz ko'tarildi: `/api/health` `problems`
+    ro'yxatini qaytardi, tokensiz `POST /api/orders` → 401, noto'g'ri
+    telefon → `invalid-phone`, noma'lum yo'l → 404.
+  - Chromium 390×844 (soxta Firestore, soxta Firebase auth, `page.route`
+    bilan to'xtatilgan API): to'lov ro'yxatida faqat "Naqd" va
+    "Kuryerda karta"; buyurtma `Bearer` tokeni bilan yuborildi, savat
+    va draft tozalandi, `#/order/ord-1` ga o'tdi; `out-of-zone`,
+    `stop-list`, `min-order` xatolarida to'g'ri xabar chiqib savat
+    saqlanib qoldi; 6 soniya kechikkan javobda tugma bloklandi va
+    "Server uyg'onmoqda" ko'rindi; narx farqi ogohlantirildi;
+    OTP production yo'li ishladi (telefon normallashdi, servis bergan
+    30 sek taymer qo'llandi, custom token bilan kirildi). Konsolda
+    xato yo'q (faqat sandboxda bloklangan Yandex Maps skripti).
 
 ---
 
