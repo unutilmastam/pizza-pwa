@@ -165,7 +165,47 @@ export async function getBanners() {}
  * @param {string} uid
  * @returns {Promise<?object>}
  */
-export async function getUser(uid) {}
+export async function getUser(uid) {
+  if (!uid) return null;
+  const { dbx, sdk } = await getFirebase();
+  const snap = await sdk.getDoc(sdk.doc(dbx, 'users', uid));
+  return snap.exists() ? { uid, ...snap.data() } : null;
+}
+
+/**
+ * `users/{uid}` hujjatini yaratadi yoki mavjudini yangilaydi (kirish paytida).
+ *
+ * Faqat XAVFSIZ maydonlar yoziladi: `bonusBalance`, `tier`, `totalSpent`,
+ * `blocked` — Security Rules bo'yicha client ularga tegmaydi, ularni
+ * Node servis boshqaradi.
+ *
+ * @param {string} uid
+ * @param {{phone?: string, name?: string, lang?: string}} [data]
+ * @returns {Promise<object>} hujjatning joriy holati
+ */
+export async function ensureUserDoc(uid, data = {}) {
+  const { dbx, sdk } = await getFirebase();
+  const ref = sdk.doc(dbx, 'users', uid);
+  const snap = await sdk.getDoc(ref);
+
+  const safe = {};
+  if (data.phone) safe.phone = data.phone;
+  if (data.name) safe.name = data.name;
+  if (data.lang) safe.lang = data.lang;
+
+  if (!snap.exists()) {
+    const fresh = { name: '', ...safe };
+    await sdk.setDoc(ref, {
+      ...fresh,
+      createdAt: sdk.serverTimestamp(),
+      lastLoginAt: sdk.serverTimestamp()
+    });
+    return { uid, ...fresh };
+  }
+
+  await sdk.updateDoc(ref, { ...safe, lastLoginAt: sdk.serverTimestamp() });
+  return { uid, ...snap.data(), ...safe };
+}
 
 /**
  * Profil maydonlarini yangilaydi (ism, tug'ilgan kun, til).
@@ -174,7 +214,10 @@ export async function getUser(uid) {}
  * @param {{name?: string, birthday?: string, lang?: string}} patch
  * @returns {Promise<void>}
  */
-export async function updateUserProfile(uid, patch) {}
+export async function updateUserProfile(uid, patch) {
+  const { dbx, sdk } = await getFirebase();
+  await sdk.updateDoc(sdk.doc(dbx, 'users', uid), patch);
+}
 
 /**
  * Bonus tarixi (yig'ilgan / sarflangan / kuygan), yangisi birinchi.

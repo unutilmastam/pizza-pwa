@@ -29,6 +29,27 @@ export const FIREBASE_SDK = {
 export const API_BASE = 'https://pizza-api.onrender.com';
 
 /**
+ * Autentifikatsiya rejimi.
+ *
+ *  - `test`       — Node servis hali yo'q. SMS yuborilmaydi, kod
+ *                   `TEST_OTP_CODE` bilan solishtiriladi, sessiya
+ *                   `signInAnonymously()` orqali ochiladi va telefon
+ *                   `users/{uid}` hujjatiga yoziladi.
+ *  - `production` — 6-bosqichda yoqiladi: `/api/auth/send-otp` va
+ *                   `/api/auth/verify-otp`, so'ng `signInWithCustomToken()`.
+ *
+ * Rejimni almashtirish uchun shu qiymatni o'zgartirish yetarli —
+ * `js/auth.js` ikkala yo'lni ham biladi.
+ */
+export const AUTH_MODE = 'test';
+
+/** Test rejimidagi yagona to'g'ri kod. Ekranda ham shu ko'rsatiladi. */
+export const TEST_OTP_CODE = '000000';
+
+/** OTP kodini qayta yuborish taymeri (soniya). */
+export const OTP_RESEND_SECONDS = 60;
+
+/**
  * Yandex Maps JS API 2.1.
  * Skript FAQAT manzil sahifasi ochilganda yuklanadi (`js/pages/address.js`
  * dagi `loadYmaps()`), bosh sahifada umuman so'ralmaydi.

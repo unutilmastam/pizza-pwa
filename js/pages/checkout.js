@@ -404,6 +404,13 @@ export function render() {
       toast(t('checkout.minOrderNotMet', { sum: formatPrice(totals.minOrder) }), { type: 'error' });
       return;
     }
+    // SPEC 55: buyurtma berishdan oldin telefon tasdiqlanadi.
+    // Mehmon savatni to'ldirishi mumkin, lekin yuborishdan oldin kiradi.
+    if (!current.user) {
+      toast(t('auth.required'), { type: 'error' });
+      navigate('/auth?next=/checkout');
+      return;
+    }
     if (form.orderType === 'delivery' && !form.address) {
       toast(t('checkout.addressRequired'), { type: 'error' });
       return;

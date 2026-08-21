@@ -77,13 +77,19 @@
   <script type="module">
     // Ilova karkasini ishga tushirish. Sahifalar routerga ro'yxatdan o'tadi;
     // keyingi bosqichlarda bu yerdagi loader'lar haqiqiy modullarga almashadi.
-    import { initState, subscribe, cartCount, setLang } from './js/state.js';
+    import { initState, subscribe, cartCount, setLang, getState } from './js/state.js';
     import { applyI18n, t, LANGS, getLang } from './js/i18n.js';
-    import { register, registerNotFound, start } from './js/router.js';
+    import { register, registerNotFound, start, navigate } from './js/router.js';
     import { emptyState, el, bottomSheet, toast } from './js/ui.js';
+    import { formatPhone } from './js/utils.js';
+    import { initAuth } from './js/auth.js';
 
     initState();
     applyI18n();
+
+    // Firebase sessiyasi FAQAT ilgari kirgan foydalanuvchi uchun tiklanadi —
+    // mehmon uchun bosh sahifa ortiqcha so'rovsiz ochiladi.
+    initAuth();
 
     /**
      * 0-bosqich uchun vaqtinchalik sahifa — bo'lim keyingi bosqichda to'ladi.
@@ -101,8 +107,27 @@
     register('/cart', () => import('./js/pages/cart.js'));
     register('/checkout', () => import('./js/pages/checkout.js'));
     register('/address', () => import('./js/pages/address.js'));
+    register('/auth', () => import('./js/pages/auth.js'));
     register('/orders', stubPage('order.title', '🧾'));
-    register('/profile', stubPage('profile.title', '👤'));
+    // Profil to'liq 5-bosqichda. Hozircha kirish/chiqish tugmasi bor —
+    // aks holda auth sahifasiga borish yo'li bo'lmaydi.
+    register('/profile', () => ({
+      render: () => {
+        const user = getState().user;
+        return el('div.page', {}, [
+          emptyState({
+            icon: '👤',
+            title: user ? formatPhone(user.phone) : t('profile.guest'),
+            hint: t('app.emptyStage'),
+            action: el('button.btn.btn--primary', {
+              text: user ? t('auth.logout') : t('auth.login'),
+              attrs: { type: 'button' },
+              on: { click: () => navigate('/auth') }
+            })
+          })
+        ]);
+      }
+    }));
     registerNotFound(() => ({
       render: () => el('div.page', {}, [
         emptyState({ icon: '🤷', title: t('app.notFound'), hint: location.hash })
