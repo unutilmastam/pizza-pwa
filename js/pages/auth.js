@@ -220,9 +220,11 @@ function renderPhoneStep(body, goNext) {
     submit.disabled = true;
     loader.show();
     try {
-      await sendOtp(phone);
+      // Render bepul planida birinchi so'rov servisni uyg'otadi — uzoq
+      // kutishda foydalanuvchi nima bo'layotganini bilsin
+      const result = await sendOtp(phone, () => toast(t('auth.waking')));
       haptic();
-      renderCodeStep(body, phone, goNext);
+      renderCodeStep(body, phone, goNext, result.resendAfter);
     } catch (e) {
       console.error('[auth] kod yuborilmadi:', e);
       toast(t(authErrorKey(e)), { type: 'error' });
@@ -264,9 +266,13 @@ function renderPhoneStep(body, goNext) {
  * @param {HTMLElement} body
  * @param {string} phone
  * @param {Function} goNext
+ * @param {number} [resendAfter] - servis bergan qayta yuborish taymeri (sek)
  */
-function renderCodeStep(body, phone, goNext) {
+function renderCodeStep(body, phone, goNext, resendAfter) {
   stopTimer();
+
+  /** Taymer uzunligi: servis aytgani ustun, aks holda config qiymati. */
+  let waitSeconds = Number(resendAfter) > 0 ? Number(resendAfter) : OTP_RESEND_SECONDS;
 
   const boxes = otpBoxes((code) => confirmCode(code));
   const errorLine = el('p.field__error', { attrs: { hidden: 'hidden' } });
@@ -311,9 +317,9 @@ function renderCodeStep(body, phone, goNext) {
     }
   }
 
-  /** 60 soniyalik taymerni boshlaydi. */
+  /** Qayta yuborish taymerini boshlaydi. */
   function startTimer() {
-    let left = OTP_RESEND_SECONDS;
+    let left = waitSeconds;
     resend.disabled = true;
     resend.textContent = t('auth.resendIn', { sec: left });
     stopTimer();
@@ -332,7 +338,8 @@ function renderCodeStep(body, phone, goNext) {
   resend.addEventListener('click', async () => {
     resend.disabled = true;
     try {
-      await sendOtp(phone);
+      const result = await sendOtp(phone, () => toast(t('auth.waking')));
+      if (Number(result.resendAfter) > 0) waitSeconds = Number(result.resendAfter);
       toast(t('auth.codeSent'));
       boxes.clear();
       startTimer();

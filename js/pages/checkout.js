@@ -4,20 +4,25 @@
  * Bo'limlar: yetkazish turi, manzil yoki filial, vaqt, to'lov usuli,
  * qaytim, idish-tovoq, izoh, oferta va yakuniy narx.
  *
- * Buyurtmani serverga yuborish 6-bosqichda (Node servis) ulanadi:
- * SPEC bo'yicha client `orders` ga yoza olmaydi va narxni o'zi belgilay
- * olmaydi. Shu sababli "Buyurtma berish" tugmasi hozircha to'liq
- * tekshiruvdan o'tkazib, buyurtma draftini saqlaydi.
+ * Buyurtma Node servisga yuboriladi (`POST /api/orders`). SPEC bo'yicha
+ * client `orders` kolleksiyasiga yoza olmaydi va narxni o'zi belgilay
+ * olmaydi: bu yerdagi summalar faqat ko'rsatish uchun, YAKUNIY narxni
+ * servis `menu/current` dan qayta hisoblaydi.
+ *
+ * Render bepul planida servis uxlab qolishi mumkin — birinchi so'rov
+ * 30–60 soniya davom etadi, shuning uchun tugma bloklanadi va
+ * "server uyg'onmoqda" xabari ko'rsatiladi.
  */
 
 import { t } from '../i18n.js';
-import { el, modal, toast, skeleton } from '../ui.js';
+import { el, toast, skeleton } from '../ui.js';
 import { formatPrice, clamp, haptic } from '../utils.js';
 import { APP } from '../config.js';
 import { getBranches } from '../db.js';
+import { createOrder, ApiError } from '../api.js';
 import { navigate, back } from '../router.js';
 import {
-  getState, setOrderType, setBranch, setCheckout, setOrderDraft
+  getState, setOrderType, setBranch, setCheckout, setOrderDraft, clearCart
 } from '../state.js';
 import { calcTotals } from './cart.js';
 
@@ -148,6 +153,13 @@ export function render() {
 
   const sections = el('div.checkout-body');
   const cta = el('div.cart-cta');
+
+  /** Yuborish tugmasi va uning ostidagi holat matni. */
+  let submitBtn = null;
+  const ctaNote = el('p.hint.cta-note', { attrs: { 'aria-live': 'polite' } });
+
+  /** Buyurtma yuborilayotgan paytda takroriy bosishni to'sadi. */
+  let sending = false;
   root.append(
     el('div.page__head', {}, [
       el('button.icon-btn', {
@@ -355,11 +367,12 @@ export function render() {
     ]));
 
     // --- yakuniy tugma
-    cta.replaceChildren(el('button.btn.btn--primary.btn--lg.btn--block', {
+    submitBtn = el('button.btn.btn--primary.btn--lg.btn--block', {
       text: `${t('checkout.submit')} · ${formatPrice(totals.total)}`,
       attrs: { type: 'button' },
       on: { click: () => submit(totals) }
-    }));
+    });
+    cta.replaceChildren(submitBtn, ctaNote);
   }
 
   /**
@@ -390,10 +403,52 @@ export function render() {
   }
 
   /**
-   * Formani tekshiradi va buyurtma draftini saqlaydi.
+   * Servis xatosini foydalanuvchi tushunadigan matnga aylantiradi.
+   * @param {*} error
+   * @returns {string}
+   */
+  function orderErrorText(error) {
+    const code = String((error && error.code) || '');
+    if (code === 'out-of-zone') return t('checkout.outOfZone');
+    if (code === 'min-order') {
+      return t('checkout.minOrderNotMet', { sum: formatPrice(error.data?.minOrder || 0) });
+    }
+    if (code === 'stop-list' || code.endsWith('-unavailable')) return t('checkout.itemUnavailable');
+    if (code === 'timeout' || code === 'network') return t('checkout.serverUnreachable');
+    if (code === 'no-session' || error?.status === 401) return t('auth.required');
+    if (code === 'no-address') return t('checkout.addressRequired');
+    if (code === 'no-branch') return t('checkout.branchRequired');
+    if (code === 'time-too-soon') {
+      return t('checkout.timeTooSoon', { min: APP.delivery.minLeadMinutes });
+    }
+    // Promokod va qolgan tekshiruvlar uchun servis matni aniqroq
+    if (error instanceof ApiError && error.status >= 400 && error.status < 500 && error.message) {
+      return error.message;
+    }
+    return t('app.error');
+  }
+
+  /**
+   * Tugma holatini almashtiradi.
+   * @param {boolean} busy
+   * @param {string} [note]
+   */
+  function setBusy(busy, note = '') {
+    sending = busy;
+    if (submitBtn) {
+      submitBtn.disabled = busy;
+      submitBtn.classList.toggle('is-loading', busy);
+      if (busy) submitBtn.textContent = t('checkout.sending');
+    }
+    ctaNote.textContent = note;
+  }
+
+  /**
+   * Formani tekshiradi va buyurtmani Node servisga yuboradi.
    * @param {object} totals
    */
-  function submit(totals) {
+  async function submit(totals) {
+    if (sending) return;
     const current = getState();
 
     if (!current.cart.length) {
@@ -440,7 +495,7 @@ export function render() {
       return;
     }
 
-    // Draft `orders` sxemasiga mos yig'iladi (SPEC 2-bo'lim).
+    // So'rov tanasi `orders` sxemasiga mos yig'iladi (SPEC 2-bo'lim).
     // Narx bu yerda YAKUNIY emas — Node servis uni qayta hisoblaydi.
     const draft = {
       type: form.orderType,
@@ -472,6 +527,8 @@ export function render() {
       createdAt: new Date().toISOString()
     };
 
+    // Yuborishdan oldin saqlab qo'yiladi: so'rov uzilib qolsa forma
+    // qaytadan to'ldirilmasin.
     setOrderDraft(draft);
     setCheckout({
       paymentMethod: form.paymentMethod,
@@ -479,13 +536,42 @@ export function render() {
       cutlery: form.cutlery,
       comment: form.comment
     });
-    haptic([10, 30, 10]);
 
-    modal({
-      title: t('checkout.draftSaved'),
-      content: t('checkout.draftHint'),
-      actions: [{ label: t('common.close'), variant: 'primary' }]
-    });
+    setBusy(true);
+    try {
+      const order = await createOrder(draft, () => {
+        // Render bepul planida servis uyqudan uyg'onadi — kutish uzoq
+        if (sending) ctaNote.textContent = t('checkout.serverWaking');
+      });
+
+      // Buyurtma qabul qilindi: savat va draft tozalanadi
+      clearCart();
+      setOrderDraft(null);
+      haptic([10, 30, 10]);
+
+      // Servis narxni qayta hisoblaydi — farq bo'lsa jim o'tmaymiz
+      if (Math.round(order.total) !== Math.round(totals.total)) {
+        console.warn('[checkout] narx farqi:', totals.total, '→', order.total);
+        toast(t('checkout.priceChanged'), { type: 'info' });
+      }
+
+      // Treking sahifasiga o'tamiz — buyurtma holati o'sha yerda jonli
+      // kuzatiladi, shuning uchun modal o'rniga qisqa xabar yetarli.
+      toast(t('checkout.placedHint', { n: order.orderNumber }), { type: 'success' });
+      navigate(`/order/${order.id}`);
+    } catch (e) {
+      console.error('[checkout] buyurtma yuborilmadi:', e);
+      toast(orderErrorText(e), { type: 'error' });
+      if (e && (e.code === 'no-session' || e.status === 401)) {
+        navigate('/auth?next=/checkout');
+      }
+    } finally {
+      setBusy(false);
+      // Tugma matni narx bilan birga tiklanadi
+      if (submitBtn) {
+        submitBtn.textContent = `${t('checkout.submit')} · ${formatPrice(totals.total)}`;
+      }
+    }
   }
 
   rebuild();

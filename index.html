@@ -82,6 +82,7 @@
     import { register, registerNotFound, start, navigate } from './js/router.js';
     import { emptyState, el, bottomSheet, toast } from './js/ui.js';
     import { initAuth } from './js/auth.js';
+    import { wakeUp } from './js/api.js';
 
     initState();
     applyI18n();
@@ -107,6 +108,12 @@
 
     start(document.getElementById('app'), { fallback: '/menu' });
 
+    // Node servis Render bepul planida uxlaydi va birinchi so'rov 30–60
+    // soniya ketadi. Menyu Firestore'dan kelgani uchun bosh sahifada servis
+    // kerak emas — uni faqat savat/checkout/kirish yo'liga chiqilganda,
+    // fonda uyg'otamiz. Shunda buyurtma berish payti kutish qisqaradi.
+    const WAKE_ROUTES = ['/cart', '/checkout', '/auth'];
+
     // Pastki navdagi faol bo'limni belgilash
     const navItems = [...document.querySelectorAll('.app-nav__item')];
     document.addEventListener('route:change', (e) => {
@@ -114,6 +121,7 @@
       navItems.forEach((item) => {
         item.classList.toggle('is-active', path.startsWith(item.dataset.route));
       });
+      if (WAKE_ROUTES.some((route) => path.startsWith(route))) wakeUp();
     });
 
     // Savat badge — holat o'zgarganda yangilanadi
