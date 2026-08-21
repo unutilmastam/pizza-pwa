@@ -22,7 +22,8 @@ import { getBranches } from '../db.js';
 import { createOrder, ApiError } from '../api.js';
 import { navigate, back } from '../router.js';
 import {
-  getState, setOrderType, setBranch, setCheckout, setOrderDraft, clearCart
+  getState, setOrderType, setBranch, setCheckout, setOrderDraft, clearCart,
+  getOrderKey, clearOrderKey
 } from '../state.js';
 import { calcTotals } from './cart.js';
 
@@ -414,7 +415,17 @@ export function render() {
       return t('checkout.minOrderNotMet', { sum: formatPrice(error.data?.minOrder || 0) });
     }
     if (code === 'stop-list' || code.endsWith('-unavailable')) return t('checkout.itemUnavailable');
-    if (code === 'timeout' || code === 'network') return t('checkout.serverUnreachable');
+    if (code === 'order-in-progress') return t('checkout.inProgress');
+    // Timeout ham, uzilgan ulanish ham "javob kelmadi" degani — buyurtma
+    // serverda YARATILGAN bo'lishi mumkin. Shuning uchun matn "qayta
+    // urinib ko'ring" emas, "qayta bosing, takrorlanmaydi" deydi;
+    // idempotency kaliti buni kafolatlaydi.
+    // Faqat brauzer oflayn bo'lsa so'rov umuman ketmagani aniq.
+    if (code === 'timeout' || code === 'network') {
+      return navigator.onLine === false
+        ? t('checkout.serverUnreachable')
+        : t('checkout.maybeSent');
+    }
     if (code === 'no-session' || error?.status === 401) return t('auth.required');
     if (code === 'no-address') return t('checkout.addressRequired');
     if (code === 'no-branch') return t('checkout.branchRequired');
@@ -539,14 +550,25 @@ export function render() {
 
     setBusy(true);
     try {
-      const order = await createOrder(draft, () => {
-        // Render bepul planida servis uyqudan uyg'onadi — kutish uzoq
-        if (sending) ctaNote.textContent = t('checkout.serverWaking');
+      // Kalit muvaffaqiyatgacha o'zgarmaydi: timeout'dan keyin qayta
+      // bosilsa ayni o'sha kalit ketadi va servis yangi buyurtma
+      // yaratmaydi, birinchisini qaytaradi.
+      const order = await createOrder(draft, {
+        idempotencyKey: getOrderKey(),
+        onSlow: () => {
+          // Render bepul planida servis uyqudan uyg'onadi — kutish uzoq
+          if (sending) ctaNote.textContent = t('checkout.serverWaking');
+        }
       });
 
-      // Buyurtma qabul qilindi: savat va draft tozalanadi
+      if (order.duplicate) {
+        console.log('[checkout] bu buyurtma allaqachon yaratilgan:', order.id);
+      }
+
+      // Buyurtma qabul qilindi: savat, draft va kalit tozalanadi
       clearCart();
       setOrderDraft(null);
+      clearOrderKey();
       haptic([10, 30, 10]);
 
       // Servis narxni qayta hisoblaydi — farq bo'lsa jim o'tmaymiz

@@ -59,9 +59,17 @@ function emptyState() {
     },
     /**
      * @type {?object} rasmiylashtirilgan, lekin hali yuborilmagan buyurtma.
-     * Node servis 6-bosqichda ulanadi — shu paytgacha draft saqlanib turadi.
+     * So'rov uzilib qolsa forma qaytadan to'ldirilmasin uchun saqlanadi.
      */
-    orderDraft: null
+    orderDraft: null,
+    /**
+     * @type {?string} joriy buyurtma urinishining idempotency kaliti.
+     *
+     * Bir marta yaratiladi va buyurtma MUVAFFAQIYATLI yakunlanmaguncha
+     * o'zgarmaydi. Shu sababli timeout'dan keyingi takroriy bosish ayni
+     * o'sha kalit bilan ketadi va servis yangi buyurtma yaratmaydi.
+     */
+    orderKey: null
   };
 }
 
@@ -263,6 +271,29 @@ export function setCheckout(patch) {
  */
 export function setOrderDraft(draft) {
   state.orderDraft = draft || null;
+  commit();
+}
+
+/**
+ * Joriy buyurtma urinishining idempotency kalitini qaytaradi.
+ *
+ * Kalit yo'q bo'lsa yangisi yasaladi va saqlanadi. Buyurtma
+ * muvaffaqiyatli o'tgach `clearOrderKey()` chaqiriladi — keyingi
+ * buyurtma yangi kalit oladi.
+ *
+ * @returns {string}
+ */
+export function getOrderKey() {
+  if (!state.orderKey) {
+    state.orderKey = uid() + uid();
+    commit();
+  }
+  return state.orderKey;
+}
+
+/** Kalitni bo'shatadi — buyurtma qabul qilingandan keyin. */
+export function clearOrderKey() {
+  state.orderKey = null;
   commit();
 }
 
