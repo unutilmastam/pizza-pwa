@@ -247,6 +247,37 @@ Kalit noto'g'ri bo'lsa servis buni **ishga tushishda** aytadi —
 `FIREBASE_PRIVATE_KEY PEM shaklida emas...` satri chiqadi, tushunarsiz
 OpenSSL xatosini kutib o'tirishga hojat yo'q.
 
+#### Kalit diagnostikasi
+
+`/api/health?deep=1` javobida `credentials` bo'limi bor. **Kalitning
+o'zi ham, biror bo'lagi ham qaytarilmaydi** — faqat o'lchamlar va shakl
+belgilari:
+
+| Maydon | To'g'ri qiymat |
+| --- | --- |
+| `keySource` | `base64` yoki `plain` — qaysi env ishlatilgani |
+| `keyLength` | ishlatilgan env qiymatining uzunligi (base64 uchun ~2200) |
+| `keyLines` | dekodlangan PEM qatorlari soni — **~28** |
+| `keyBodyLength` | PEM ichidagi base64 tana — **~1600** |
+| `keyHasHeader` / `keyHasFooter` | ikkalasi ham `true` |
+| `keyLooksComplete` | `true` |
+| `clientEmail`, `projectId` | JSON fayldagi qiymatlar bilan bir xil |
+| `emailMatchesProject` | `true` — email `@<projectId>.iam.gserviceaccount.com` bilan tugashi |
+
+`keyLines` yoki `keyBodyLength` kutilganidan kichik bo'lsa — kalit
+yarim ko'chirilgan.
+
+Firestore xatosi bo'lsa `firestore` maydonida `code`, `message` va
+`hint` keladi. `UNAUTHENTICATED` (`code: 16`) — kalit shakl jihatidan
+to'g'ri, lekin Google uni qabul qilmadi. Sabablari:
+
+1. **Kalit Firebase konsolida o'chirilgan yoki almashtirilgan** — eng
+   ko'p uchraydigani. Yangi private key yarating.
+2. **Qiymatlar turli JSON fayllardan olingan** — `FIREBASE_CLIENT_EMAIL`
+   bir akkauntdan, private key boshqasidan. Uchalasi ham **bitta**
+   JSON fayldan olinishi shart.
+3. **Kalit to'liq emas** — yuqoridagi `keyBodyLength` ni tekshiring.
+
 ### 5. Firestore indekslari
 
 Servis bir nechta murakkab so'rov qiladi — Firestore ular uchun

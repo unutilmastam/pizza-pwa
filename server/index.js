@@ -12,7 +12,7 @@
  */
 
 import express from 'express';
-import { config, checkConfig } from './src/config.js';
+import { config, checkConfig, keyDiagnostics } from './src/config.js';
 import { pingDb } from './src/firebase.js';
 import { requestOtp, verifyOtp, httpError } from './src/otp.js';
 import { createOrder, updateStatus, PAYMENT_METHODS } from './src/orders.js';
@@ -49,17 +49,56 @@ app.get('/api/health', wrap(async (req, res) => {
   };
 
   if (req.query.deep) {
+    // Xizmat akkaunti diagnostikasi — kalitning O'ZI hech qachon
+    // qaytarilmaydi, faqat o'lchamlar va shakl belgilari. Bu
+    // UNAUTHENTICATED sababini (yarim ko'chirilgan kalit, boshqa
+    // loyihaning akkaunti) topish uchun kerak.
+    body.credentials = keyDiagnostics();
+
     try {
       await pingDb();
       body.firestore = 'ok';
     } catch (e) {
       body.ok = false;
-      body.firestore = e.message;
+      body.firestore = {
+        code: e.code ?? null,
+        status: e.status ?? null,
+        message: String(e.message || '').slice(0, 300),
+        hint: firestoreHint(e)
+      };
     }
   }
 
   res.json(body);
 }));
+
+/**
+ * Firestore xatosining eng ehtimolli sababini aytadi.
+ * @param {*} error
+ * @returns {?string}
+ */
+function firestoreHint(error) {
+  const text = `${error.code ?? ''} ${error.message ?? ''}`.toUpperCase();
+
+  if (text.includes('UNAUTHENTICATED') || text.includes('INVALID_GRANT')) {
+    return 'Kalit o\'qildi, lekin Google uni qabul qilmadi. Odatdagi sabablar: ' +
+      '(1) kalit Firebase konsolida o\'chirilgan yoki almashtirilgan — yangi ' +
+      'xizmat akkaunti kaliti yarating; (2) FIREBASE_CLIENT_EMAIL boshqa ' +
+      'akkauntdan, private key esa boshqasidan — uchala qiymat BITTA JSON ' +
+      'fayldan olinsin; (3) kalit to\'liq ko\'chirilmagan — shu javobdagi ' +
+      'credentials.keyBodyLength ~1600 va keyLines ~28 bo\'lishi kerak.';
+  }
+  if (text.includes('PERMISSION_DENIED')) {
+    return 'Xizmat akkauntida huquq yetarli emas yoki Firestore API yoqilmagan.';
+  }
+  if (text.includes('NOT_FOUND')) {
+    return 'Loyihada Firestore bazasi yaratilmagan yoki projectId noto\'g\'ri.';
+  }
+  if (text.includes('DECODER') || text.includes('PEM')) {
+    return 'Kalit PEM shaklida emas — README dagi base64 variantini ishlating.';
+  }
+  return null;
+}
 
 // --- Auth -----------------------------------------------------------------
 app.post('/api/auth/send-otp', rateLimit({ windowMs: 600000, max: 10 }), wrap(async (req, res) => {

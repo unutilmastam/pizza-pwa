@@ -55,16 +55,25 @@ function list(name) {
  * U bo'lsa shundan olinadi; bo'lmasa eski `FIREBASE_PRIVATE_KEY`
  * ishlatiladi va `\n` almashtiriladi.
  *
- * @returns {string} PEM kalit yoki bo'sh satr
+ * @returns {{key: string, source: string, rawLength: number}}
  */
 function readPrivateKey() {
   const base64 = str('FIREBASE_PRIVATE_KEY_BASE64');
   if (base64) {
     // Bo'shliq va qator ko'chishi base64 ichida ma'nosiz — tozalaymiz
     const clean = base64.replace(/\s+/g, '');
-    return normalizePem(Buffer.from(clean, 'base64').toString('utf8'));
+    return {
+      key: normalizePem(Buffer.from(clean, 'base64').toString('utf8')),
+      source: 'base64',
+      rawLength: base64.length
+    };
   }
-  return normalizePem(str('FIREBASE_PRIVATE_KEY'));
+  const plain = str('FIREBASE_PRIVATE_KEY');
+  return {
+    key: normalizePem(plain),
+    source: plain ? 'plain' : 'none',
+    rawLength: plain.length
+  };
 }
 
 /**
@@ -89,6 +98,48 @@ function normalizePem(value) {
   return key ? `${key}\n` : '';
 }
 
+/** Kalit qayerdan olingani va qanday shaklda ekani — bir marta hisoblanadi. */
+const keyRead = readPrivateKey();
+
+/**
+ * Kalit haqidagi MAXFIY BO'LMAGAN diagnostika.
+ *
+ * Kalitning o'zi ham, uning biror bo'lagi ham qaytarilmaydi — faqat
+ * o'lchamlar va shakl belgilari. Bu `UNAUTHENTICATED` xatosining eng
+ * ko'p uchraydigan sababini — kalit yarim ko'chirilgani yoki boshqa
+ * loyihaniki ekanini — ochib beradi.
+ *
+ * Mo'ljal: 2048-bitli xizmat akkaunti kaliti dekodlanganda ~28 qator,
+ * ichki base64 tanasi ~1600 belgi bo'ladi.
+ *
+ * @returns {object}
+ */
+export function keyDiagnostics() {
+  const key = keyRead.key;
+  const lines = key ? key.trim().split('\n').length : 0;
+  // PEM ichidagi base64 tanasi — sarlavha va yakunsiz
+  const body = key
+    .replace(/-----BEGIN [A-Z ]*PRIVATE KEY-----/, '')
+    .replace(/-----END [A-Z ]*PRIVATE KEY-----/, '')
+    .replace(/\s+/g, '');
+
+  return {
+    keySource: keyRead.source,
+    keyLength: keyRead.rawLength,
+    keyLines: lines,
+    keyBodyLength: body.length,
+    keyHasHeader: /-----BEGIN [A-Z ]*PRIVATE KEY-----/.test(key),
+    keyHasFooter: /-----END [A-Z ]*PRIVATE KEY-----/.test(key),
+    keyLooksComplete: isPemKey(key) && body.length > 1000,
+    clientEmail: config.firebase.clientEmail,
+    projectId: config.firebase.projectId,
+    // Email loyihaga mos kelmasa UNAUTHENTICATED shundan bo'ladi
+    emailMatchesProject: Boolean(config.firebase.clientEmail) &&
+      config.firebase.clientEmail.endsWith(`@${config.firebase.projectId}.iam.gserviceaccount.com`),
+    serverTime: new Date().toISOString()
+  };
+}
+
 export const config = {
   port: int('PORT', 8080),
   env: str('NODE_ENV', 'development'),
@@ -100,7 +151,7 @@ export const config = {
     projectId: str('FIREBASE_PROJECT_ID'),
     clientEmail: str('FIREBASE_CLIENT_EMAIL'),
     // base64 ustun, aks holda `\n` li oddiy variant — `readPrivateKey()` ga qarang
-    privateKey: readPrivateKey()
+    privateKey: keyRead.key
   },
 
   otp: {
