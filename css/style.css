@@ -1762,6 +1762,14 @@ body:has(.cart-cta) .toasts {
   display: none;
 }
 
+/* Neytral xabar (masalan OpenStreetMap atributsiyasi) */
+.map-notice--info {
+  background: var(--surface-2);
+  border-left-color: var(--border);
+  color: var(--text-2);
+  font-size: var(--fs-xs);
+}
+
 .zone-info__box {
   display: flex;
   flex-direction: column;
