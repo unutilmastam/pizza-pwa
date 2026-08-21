@@ -43,12 +43,37 @@ export function formatDate(input, opts = {}) {
     return withTime ? `${t('common.yesterday')}, ${time}` : t('common.yesterday');
   }
 
-  const day = date.toLocaleDateString(locale, {
+  const day = formatDay(date, locale, today.getFullYear());
+  return withTime ? `${day}, ${time}` : day;
+}
+
+/**
+ * O'zbekcha oy nomlari — brauzerning `uz-UZ` lokali oyni "M08" deb
+ * qaytaradi, shuning uchun qisqartmalar qo'lda yoziladi.
+ */
+const UZ_MONTHS = [
+  'yan', 'fev', 'mar', 'apr', 'may', 'iyn',
+  'iyl', 'avg', 'sen', 'okt', 'noy', 'dek'
+];
+
+/**
+ * Sanani "18 avg" yoki "18 avg 2025" ko'rinishida beradi.
+ * @param {Date} date
+ * @param {string} locale
+ * @param {number} currentYear
+ * @returns {string}
+ */
+function formatDay(date, locale, currentYear) {
+  const sameYear = date.getFullYear() === currentYear;
+  if (locale === 'uz-UZ') {
+    const base = `${date.getDate()} ${UZ_MONTHS[date.getMonth()]}`;
+    return sameYear ? base : `${base} ${date.getFullYear()}`;
+  }
+  return date.toLocaleDateString(locale, {
     day: 'numeric',
     month: 'short',
-    year: date.getFullYear() === today.getFullYear() ? undefined : 'numeric'
+    year: sameYear ? undefined : 'numeric'
   });
-  return withTime ? `${day}, ${time}` : day;
 }
 
 /**

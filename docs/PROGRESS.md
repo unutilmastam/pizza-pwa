@@ -3,7 +3,7 @@
 > Har seans boshida shu faylni o'qi. Faqat "Joriy bosqich" deb belgilangan
 > ishni bajar. Boshqa bosqichlarga o'tma. Tugagach shu faylni yangila.
 
-**Joriy bosqich: 5**
+**Joriy bosqich: 6**
 
 ---
 
@@ -329,7 +329,7 @@ Izoh:
 ---
 
 ## Bosqich 5 — treking va profil
-Status: **joriy**
+Status: **bajarildi**
 
 `js/pages/order.js`, `js/pages/profile.js`
 - `onSnapshot` real-time, 7 status stepper, kafolat taymeri
@@ -337,11 +337,62 @@ Status: **joriy**
 - Profil: tarix, takrorlash, bonus, manzillar
 
 Izoh:
+- `js/db.js` da yozildi: `getOrders`, `getOrder`, `watchOrder`,
+  `watchActiveOrders`, `watchCourier`, `saveRating`, `getBonusHistory`.
+  Saralash CLIENT tomonda: `where('uid')` + `orderBy('createdAt')`
+  Firestore'da kompozit indeks talab qiladi, bitta foydalanuvchining
+  buyurtmalari esa oz — indekssiz ishlaydi.
+- `js/pages/order.js` ikkita marshrutga xizmat qiladi: `#/orders`
+  (ro'yxat) va `#/order/:id` (treking). Trekingda: 7 bosqichli stepper
+  vaqt shtamplari bilan, kafolat taymeri (har soniyada sanaydi, muddat
+  o'tsa "Kafolat muddati o'tdi"), kuryer bloki (ism, telefon,
+  qo'ng'iroq), xaritada kuryer markeri, buyurtma tarkibi va narx,
+  "Takrorlash", yetkazilgach baholash oynasi (taom va kuryer alohida,
+  1–5 yulduz, matnli izoh).
+- `js/pages/profile.js`: foydalanuvchi kartochkasi (ism va tug'ilgan
+  kunni tahrirlash), bonus balansi + daraja + bonus tarixi oynasi,
+  oxirgi 3 buyurtma, manzillar/tarix/til/mavzu sozlamalari, chiqish.
+  Bonus va daraja Firestore'dan qayta o'qiladi — client ularni yoza
+  olmaydi (Security Rules).
+- Xarita skripti trekingda ham DANGASA: `address.js` dagi `loadYmaps()`
+  qayta ishlatiladi, xarita yuklanmasa faqat xarita bloki o'rniga
+  ogohlantirish chiqadi, sahifaning qolgani ishlayveradi.
+- **Buyurtmani bekor qilish** tugmasi bor, lekin u faqat xabar
+  ko'rsatadi: client `orders` ga yoza olmaydi, bekor qilish Node servis
+  orqali bo'ladi (6-bosqich).
+- Baholashda rasm yuklash yo'q — Storage ishlatilmaydi (bepul planda
+  mavjud emas). `db.uploadImage()` kontrakti hamon bo'sh turibdi.
+- **Tuzatilgan xato (router):** `compile()` da `/` belgisi
+  xavfsizlantirilmagani uchun `:id` parametri HECH QACHON mos kelmagan —
+  `#/order/ord-1` 404 berardi. Endi yo'l bo'laklarga bo'linib qayta
+  ishlanadi. Bu 0-bosqichdan beri turgan xato edi, parametrli marshrut
+  birinchi marta shu bosqichda ishlatildi.
+- Yana ikkita tuzatish: `map.getZoom()` bo'lmasa ham marker ko'chadi;
+  `formatDate()` o'zbekcha oyni "M08" deb chiqarardi (brauzer lokali),
+  endi qo'lda yozilgan qisqartmalar — "18 avg".
+- `tools/seed-order.html` — treking sahifasini sinash uchun: ilovada
+  kirgan foydalanuvchi uchun demo buyurtma yaratadi (uid `localStorage`
+  dan o'qiladi), 7 status tugmasi bilan statusni qo'lda haydaydi, kuryer
+  tayinlaydi va uni har bosishda manzil tomon ~200 metr suradi
+  (`couriers/{id}.location` va `orders/{id}.courierLocation` yangilanadi).
+- `sw.js` `VERSION = 'v7'`, `order.js` va `profile.js` app shell'da.
+  Profil va buyurtmalar endi haqiqiy sahifalar — stub'lar olib tashlandi.
+- Tekshirildi (Chromium 390×844, soxta Firestore va ymaps bilan) — 9 ta
+  stsenariy: ro'yxat kartochkasi; treking (stepper 2 bajarilgan + joriy,
+  kafolat 19:58 → 19:55 sanadi, kuryer bloki, xarita, summalar);
+  `onSnapshot` orqali status `cooking → on_way` o'zgarganda stepper o'zi
+  yangilandi; kuryer koordinatasi kelganda marker `[41.32, 69.26] →
+  [41.315, 69.272]` ga ko'chdi; `delivered` bo'lgach taymer yo'qolib
+  baholash tugmasi chiqdi, 2 ta yulduz qatori bilan baho saqlandi;
+  "Takrorlash" savatga 2 mahsulot qo'shib `#/cart` ga o'tdi; profilda
+  telefon, bonus 24 000 + "Kumush", bonus tarixi, ism tahriri va
+  qorong'i mavzu ishladi; mehmon uchun "Kirish" tugmasi chiqdi.
+  Konsolda xato yo'q.
 
 ---
 
 ## Bosqich 6 — Node servis
-Status: boshlanmagan
+Status: **joriy**
 
 `server/` — Express + Firebase Admin SDK
 - `/api/auth/send-otp`, `/verify-otp`

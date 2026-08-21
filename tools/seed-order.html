@@ -1,0 +1,620 @@
+<!DOCTYPE html>
+<html lang="uz">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="robots" content="noindex">
+  <title>Seed — demo buyurtma va treking boshqaruvi</title>
+  <style>
+    :root {
+      color-scheme: light dark;
+      --bg: #f6f7f9;
+      --surface: #fff;
+      --border: #e3e6ec;
+      --text: #14171c;
+      --muted: #5b6270;
+      --brand: #e2662a;
+      --ok: #2f9e5b;
+      --err: #d94141;
+      --warn: #e0a32e;
+    }
+    @media (prefers-color-scheme: dark) {
+      :root {
+        --bg: #0f1115;
+        --surface: #171a21;
+        --border: #272c36;
+        --text: #eef1f6;
+        --muted: #a8b0bf;
+      }
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      padding: 32px 20px 64px;
+      background: var(--bg);
+      color: var(--text);
+      font: 16px/1.5 -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    }
+    main { max-width: 720px; margin: 0 auto; }
+    h1 { font-size: 22px; margin: 0 0 4px; }
+    .sub { color: var(--muted); font-size: 14px; margin-bottom: 24px; }
+    .card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 14px;
+      padding: 20px;
+      margin-bottom: 16px;
+    }
+    .card h2 { font-size: 15px; margin: 0 0 12px; text-transform: uppercase; letter-spacing: .04em; color: var(--muted); }
+    dl { display: grid; grid-template-columns: auto 1fr; gap: 6px 16px; margin: 0; font-size: 14px; }
+    dt { color: var(--muted); }
+    dd { margin: 0; font-family: ui-monospace, SFMono-Regular, Menlo, monospace; word-break: break-all; }
+    dd.bad { color: var(--err); font-weight: 600; }
+    dd.good { color: var(--ok); }
+    .actions { display: flex; flex-wrap: wrap; gap: 10px; margin-bottom: 16px; }
+    button {
+      font: inherit;
+      font-weight: 600;
+      min-height: 46px;
+      padding: 0 22px;
+      border: 0;
+      border-radius: 10px;
+      background: var(--brand);
+      color: #fff;
+      cursor: pointer;
+    }
+    button.secondary {
+      background: transparent;
+      color: var(--text);
+      box-shadow: inset 0 0 0 1px var(--border);
+    }
+    button:disabled { opacity: .5; cursor: not-allowed; }
+    .steps { display: flex; flex-wrap: wrap; gap: 8px; }
+    .steps button {
+      min-height: 40px;
+      padding: 0 14px;
+      font-size: 14px;
+      background: transparent;
+      color: var(--text);
+      box-shadow: inset 0 0 0 1px var(--border);
+    }
+    .steps button.is-current {
+      background: var(--brand);
+      color: #fff;
+      box-shadow: none;
+    }
+    .steps button.is-done { color: var(--ok); box-shadow: inset 0 0 0 1px var(--ok); }
+    .log {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 14px;
+      padding: 16px 20px;
+      font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+      font-size: 13px;
+      white-space: pre-wrap;
+      word-break: break-word;
+      min-height: 90px;
+    }
+    .log p { margin: 0 0 6px; }
+    .log .ok { color: var(--ok); }
+    .log .err { color: var(--err); font-weight: 600; }
+    .log .warn { color: var(--warn); }
+    .log .muted { color: var(--muted); }
+    .note {
+      border-left: 3px solid var(--brand);
+      padding-left: 14px;
+      color: var(--muted);
+      font-size: 14px;
+      margin: 0 0 10px;
+    }
+    input {
+      font: inherit;
+      width: 100%;
+      min-height: 44px;
+      padding: 0 12px;
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      background: var(--surface);
+      color: var(--text);
+    }
+    label { display: block; font-size: 14px; color: var(--muted); margin-bottom: 6px; }
+    code { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; }
+  </style>
+</head>
+<body>
+<main>
+  <h1>Demo buyurtma va treking boshqaruvi</h1>
+  <p class="sub">Bir martalik vosita. <code>orders/{id}</code> yaratadi va statusini qo'lda haydaydi.</p>
+
+  <div class="card">
+    <h2>Holat</h2>
+    <dl>
+      <dt>projectId</dt><dd id="infoProject">o'qilmoqda...</dd>
+      <dt>Foydalanuvchi</dt><dd id="infoUser">—</dd>
+      <dt>Buyurtma</dt><dd id="infoOrder">—</dd>
+      <dt>Status</dt><dd id="infoStatus">—</dd>
+      <dt>Kuryer</dt><dd id="infoCourier">—</dd>
+    </dl>
+  </div>
+
+  <div class="card">
+    <h2>Diqqat</h2>
+    <p class="note">
+      Buyurtma <strong>ilovada kirgan foydalanuvchi</strong> uchun yaratiladi —
+      <code>uid</code> ilovaning <code>localStorage</code> holatidan o'qiladi.
+      Avval ilovada kiring (test rejimi, kod <code>000000</code>), so'ng bu sahifani
+      yangilang. Kerak bo'lsa <code>uid</code> ni qo'lda ham kiritish mumkin.
+    </p>
+    <p class="note">
+      Bu vosita faqat sinov uchun. Haqiqiy buyurtmani Node servis yaratadi
+      (6-bosqich) — u narxni qayta hisoblaydi va statusni o'zi boshqaradi.
+    </p>
+  </div>
+
+  <div class="card">
+    <h2>Foydalanuvchi</h2>
+    <label for="uidInput">uid</label>
+    <input id="uidInput" type="text" placeholder="ilovada kiring yoki uid yozing">
+  </div>
+
+  <div class="actions">
+    <button id="createBtn" type="button" disabled>Demo buyurtma yaratish</button>
+    <button id="loadBtn" class="secondary" type="button" disabled>Oxirgi buyurtmani ochish</button>
+  </div>
+
+  <div class="card">
+    <h2>Statusni o'zgartirish</h2>
+    <div class="steps" id="steps"></div>
+  </div>
+
+  <div class="card">
+    <h2>Kuryer</h2>
+    <p class="note">
+      Har bosishda kuryer manzil tomon ~200 metr suriladi va
+      <code>couriers/{id}.location</code> hamda <code>orders/{id}.courierLocation</code>
+      yangilanadi. Treking sahifasidagi marker real vaqtda ko'chishi kerak.
+    </p>
+    <div class="actions" style="margin: 0">
+      <button id="moveBtn" class="secondary" type="button" disabled>Kuryerni surish</button>
+      <button id="assignBtn" class="secondary" type="button" disabled>Kuryer tayinlash</button>
+    </div>
+  </div>
+
+  <div class="log" id="log" role="status" aria-live="polite"></div>
+</main>
+
+<script type="module">
+  /*
+   * Mantiq `tools/seed.html` bilan bir xil: config keshni chetlab o'tib
+   * o'qiladi, har bosqichga timeout qo'yilgan, xatolar jim qolmaydi.
+   */
+
+  const logEl = document.getElementById('log');
+  const uidInput = document.getElementById('uidInput');
+  const createBtn = document.getElementById('createBtn');
+  const loadBtn = document.getElementById('loadBtn');
+  const moveBtn = document.getElementById('moveBtn');
+  const assignBtn = document.getElementById('assignBtn');
+  const stepsBox = document.getElementById('steps');
+
+  /** Har bir bosqich uchun kutish chegarasi (ms). */
+  const TIMEOUT = { fetch: 15000, sdk: 20000, write: 20000 };
+
+  /** Buyurtma statuslari — ilovadagi APP.orderStatuses bilan bir xil. */
+  const FLOW = ['new', 'accepted', 'cooking', 'in_oven', 'packing', 'on_way', 'delivered'];
+
+  /** Demo kuryer. */
+  const COURIER = {
+    id: 'courier-demo',
+    name: 'Sardor',
+    phone: '+998901112233',
+    start: { lat: 41.3200, lng: 69.2600 }
+  };
+
+  /** Yetkazish manzili — Amir Temur ko'chasi (Markaziy filial zonasi). */
+  const ADDRESS = {
+    address: 'Toshkent, Amir Temur ko\'chasi, 12',
+    apartment: '45', entrance: '2', floor: '3',
+    lat: 41.3111, lng: 69.2797
+  };
+
+  let cfgModule = null;
+  let firestore = null;
+  let orderId = null;
+  let orderState = null;
+  let courierPos = { ...COURIER.start };
+
+  /**
+   * Ekranga bitta qator yozadi.
+   * @param {string} text
+   * @param {'info'|'ok'|'err'|'warn'|'muted'} [kind='info']
+   */
+  function log(text, kind = 'info') {
+    const time = new Date().toLocaleTimeString('uz-UZ', { hour12: false });
+    const line = document.createElement('p');
+    if (kind !== 'info') line.className = kind;
+    line.textContent = `${time}  ${text}`;
+    logEl.append(line);
+    logEl.scrollTop = logEl.scrollHeight;
+  }
+
+  /**
+   * Va'da belgilangan vaqtda tugamasa — xato beradi.
+   * @template T
+   * @param {Promise<T>} promise
+   * @param {number} ms
+   * @param {string} label
+   * @returns {Promise<T>}
+   */
+  function withTimeout(promise, ms, label) {
+    let timer = null;
+    const guard = new Promise((_, reject) => {
+      timer = setTimeout(
+        () => reject(new Error(`${label}: ${Math.round(ms / 1000)} soniyada javob bo'lmadi`)),
+        ms
+      );
+    });
+    return Promise.race([promise, guard]).finally(() => clearTimeout(timer));
+  }
+
+  /**
+   * Configdagi kamchilikni topadi.
+   * @param {object} cfg
+   * @returns {?string}
+   */
+  function configProblem(cfg) {
+    if (!cfg || typeof cfg !== 'object') return 'FIREBASE_CONFIG eksport qilinmagan';
+    const missing = ['apiKey', 'authDomain', 'projectId', 'appId'].filter((k) => !cfg[k]);
+    if (missing.length) return `to'ldirilmagan maydonlar: ${missing.join(', ')}`;
+    const ph = Object.entries(cfg)
+      .filter(([, v]) => /^(FIREBASE_|YOUR_)/.test(String(v)))
+      .map(([k]) => k);
+    return ph.length ? `placeholder qiymat qolgan: ${ph.join(', ')}` : null;
+  }
+
+  /**
+   * Ilovaning localStorage holatidan uid ni oladi.
+   * @returns {?string}
+   */
+  function uidFromApp() {
+    try {
+      const raw = localStorage.getItem('pizza.state.v1');
+      const state = raw ? JSON.parse(raw) : null;
+      return state && state.user ? state.user.uid : null;
+    } catch (e) {
+      return null;
+    }
+  }
+
+  /** Firestore SDK ni bir marta yuklaydi. */
+  async function firestoreReady() {
+    if (firestore) return firestore;
+    const { FIREBASE_CONFIG, FIREBASE_SDK } = cfgModule;
+    log('Firebase SDK yuklanmoqda...');
+    const [appSdk, storeSdk] = await withTimeout(
+      Promise.all([import(FIREBASE_SDK.app), import(FIREBASE_SDK.firestore)]),
+      TIMEOUT.sdk,
+      'SDK yuklash'
+    );
+    const app = appSdk.initializeApp(FIREBASE_CONFIG);
+    firestore = { store: storeSdk, db: storeSdk.getFirestore(app) };
+    log(`SDK tayyor, loyiha: ${app.options.projectId}`, 'ok');
+    return firestore;
+  }
+
+  /** Ekrandagi ma'lumotlarni yangilaydi. */
+  function refreshInfo() {
+    document.getElementById('infoUser').textContent = uidInput.value.trim() || '—';
+    document.getElementById('infoOrder').textContent = orderId || '—';
+    document.getElementById('infoStatus').textContent = orderState
+      ? orderState.status
+      : '—';
+    document.getElementById('infoCourier').textContent = orderState && orderState.courierId
+      ? `${orderState.courierId} (${courierPos.lat.toFixed(5)}, ${courierPos.lng.toFixed(5)})`
+      : '—';
+
+    const has = Boolean(orderId);
+    moveBtn.disabled = !has;
+    assignBtn.disabled = !has;
+    [...stepsBox.children].forEach((btn) => { btn.disabled = !has; });
+    renderSteps();
+  }
+
+  /** Status tugmalarini chizadi. */
+  function renderSteps() {
+    const current = orderState ? FLOW.indexOf(orderState.status) : -1;
+    [...stepsBox.children].forEach((btn, i) => {
+      btn.classList.toggle('is-current', i === current);
+      btn.classList.toggle('is-done', i < current);
+    });
+  }
+
+  FLOW.forEach((status, i) => {
+    const btn = document.createElement('button');
+    btn.type = 'button';
+    btn.textContent = `${i + 1}. ${status}`;
+    btn.disabled = true;
+    btn.addEventListener('click', () => setStatus(status));
+    stepsBox.append(btn);
+  });
+
+  /** Configni keshni chetlab o'tib o'qiydi. */
+  async function loadConfig() {
+    const projectEl = document.getElementById('infoProject');
+    try {
+      cfgModule = await withTimeout(
+        import(`../js/config.js?nocache=${Date.now()}`),
+        TIMEOUT.fetch,
+        'config.js yuklanmadi'
+      );
+      const cfg = cfgModule.FIREBASE_CONFIG;
+      const problem = configProblem(cfg);
+      projectEl.textContent = (cfg && cfg.projectId) || '—';
+      if (problem) {
+        projectEl.className = 'bad';
+        log(`Config yaroqsiz: ${problem}`, 'err');
+        return;
+      }
+      projectEl.className = 'good';
+      log(`Config o'qildi: ${cfg.projectId}`, 'ok');
+
+      const uid = uidFromApp();
+      if (uid) {
+        uidInput.value = uid;
+        log(`Ilovadan uid olindi: ${uid}`, 'ok');
+      } else {
+        log('Ilovada kirilmagan — uid ni qo\'lda kiriting yoki avval ilovada kiring.', 'warn');
+      }
+      createBtn.disabled = false;
+      loadBtn.disabled = false;
+      refreshInfo();
+    } catch (e) {
+      projectEl.className = 'bad';
+      log(`config.js o'qilmadi: ${e.message || e}`, 'err');
+    }
+  }
+
+  /**
+   * Demo buyurtma yaratadi.
+   */
+  createBtn.addEventListener('click', async () => {
+    const uid = uidInput.value.trim();
+    if (!uid) {
+      log('uid kiritilmagan — avval ilovada kiring.', 'err');
+      return;
+    }
+    createBtn.disabled = true;
+    try {
+      const { store, db } = await firestoreReady();
+      const number = Math.floor(1000 + Math.random() * 9000);
+      const items = [
+        {
+          productId: 'p-pepperoni', variantId: 'p-pepperoni-30', name: 'Pepperoni',
+          size: '30', dough: 'traditional', addons: [], removed: [],
+          qty: 1, unitPrice: 65000, total: 65000
+        },
+        {
+          productId: 'd-coca-cola', variantId: 'd-coca-cola-050', name: 'Coca-Cola',
+          size: '0.5 l', addons: [], removed: [], qty: 2, unitPrice: 12000, total: 24000
+        }
+      ];
+      const subtotal = items.reduce((sum, i) => sum + i.total, 0);
+      const deliveryPrice = 12000;
+
+      const order = {
+        orderNumber: number,
+        uid,
+        phone: '+998901234567',
+        name: 'Test',
+        branchId: 'markaziy',
+        type: 'delivery',
+        address: ADDRESS,
+        lat: ADDRESS.lat,
+        lng: ADDRESS.lng,
+        items,
+        subtotal,
+        deliveryPrice,
+        discount: 0,
+        bonusUsed: 0,
+        total: subtotal + deliveryPrice,
+        promoCode: null,
+        paymentMethod: 'cash',
+        paymentStatus: 'pending',
+        status: 'new',
+        statusHistory: [{ status: 'new', at: new Date().toISOString(), by: 'seed-tool' }],
+        courierId: null,
+        courierLocation: null,
+        scheduledFor: null,
+        guaranteeDeadline: new Date(Date.now() + 35 * 60000).toISOString(),
+        guaranteeBroken: false,
+        comment: 'Demo buyurtma (seed-order.html)',
+        cutlery: 2,
+        createdAt: store.serverTimestamp()
+      };
+
+      log('orders hujjati yaratilmoqda...');
+      const ref = await withTimeout(
+        store.addDoc(store.collection(db, 'orders'), order),
+        TIMEOUT.write,
+        'Buyurtma yozuvi'
+      );
+      orderId = ref.id;
+      orderState = { ...order, id: ref.id };
+      courierPos = { ...COURIER.start };
+      log(`Yaratildi: orders/${ref.id} (№${number}, ${order.total} so'm)`, 'ok');
+      log(`Treking: #/order/${ref.id}`, 'muted');
+      refreshInfo();
+    } catch (e) {
+      reportError(e);
+    } finally {
+      createBtn.disabled = false;
+    }
+  });
+
+  /** Foydalanuvchining oxirgi buyurtmasini ochadi. */
+  loadBtn.addEventListener('click', async () => {
+    const uid = uidInput.value.trim();
+    if (!uid) {
+      log('uid kiritilmagan.', 'err');
+      return;
+    }
+    loadBtn.disabled = true;
+    try {
+      const { store, db } = await firestoreReady();
+      log('Buyurtmalar o\'qilmoqda...');
+      const snap = await withTimeout(
+        store.getDocs(store.query(store.collection(db, 'orders'), store.where('uid', '==', uid))),
+        TIMEOUT.write,
+        'Buyurtmalarni o\'qish'
+      );
+      const list = snap.docs.map((d) => ({ id: d.id, ...d.data() }));
+      if (!list.length) {
+        log('Bu foydalanuvchida buyurtma yo\'q.', 'warn');
+        return;
+      }
+      list.sort((a, b) => {
+        const at = a.createdAt && a.createdAt.toMillis ? a.createdAt.toMillis() : 0;
+        const bt = b.createdAt && b.createdAt.toMillis ? b.createdAt.toMillis() : 0;
+        return bt - at;
+      });
+      orderState = list[0];
+      orderId = orderState.id;
+      if (orderState.courierLocation) courierPos = { ...orderState.courierLocation };
+      log(`Ochildi: orders/${orderId} — ${orderState.status}`, 'ok');
+      refreshInfo();
+    } catch (e) {
+      reportError(e);
+    } finally {
+      loadBtn.disabled = false;
+    }
+  });
+
+  /**
+   * Statusni o'zgartiradi va `statusHistory` ga yozadi.
+   * @param {string} status
+   */
+  async function setStatus(status) {
+    if (!orderId) return;
+    try {
+      const { store, db } = await firestoreReady();
+      const history = [
+        ...(orderState.statusHistory || []),
+        { status, at: new Date().toISOString(), by: 'seed-tool' }
+      ];
+      const patch = { status, statusHistory: history };
+      if (status === 'delivered') patch.deliveredAt = store.serverTimestamp();
+
+      log(`Status → ${status}...`);
+      await withTimeout(
+        store.updateDoc(store.doc(db, 'orders', orderId), patch),
+        TIMEOUT.write,
+        'Status yozuvi'
+      );
+      orderState = { ...orderState, ...patch };
+      log(`Status ${status} bo'ldi`, 'ok');
+      refreshInfo();
+    } catch (e) {
+      reportError(e);
+    }
+  }
+
+  /** Kuryer tayinlaydi (couriers hujjati ham yaratiladi). */
+  assignBtn.addEventListener('click', async () => {
+    if (!orderId) return;
+    assignBtn.disabled = true;
+    try {
+      const { store, db } = await firestoreReady();
+      courierPos = { ...COURIER.start };
+
+      await withTimeout(
+        store.setDoc(store.doc(db, 'couriers', COURIER.id), {
+          name: COURIER.name,
+          phone: COURIER.phone,
+          active: true,
+          location: { ...courierPos, at: new Date().toISOString() }
+        }),
+        TIMEOUT.write,
+        'Kuryer yozuvi'
+      );
+      await withTimeout(
+        store.updateDoc(store.doc(db, 'orders', orderId), {
+          courierId: COURIER.id,
+          courierName: COURIER.name,
+          courierPhone: COURIER.phone,
+          courierLocation: { ...courierPos, at: new Date().toISOString() }
+        }),
+        TIMEOUT.write,
+        'Buyurtmaga kuryer yozuvi'
+      );
+      orderState = { ...orderState, courierId: COURIER.id, courierName: COURIER.name };
+      log(`Kuryer tayinlandi: ${COURIER.name} (${COURIER.id})`, 'ok');
+      refreshInfo();
+    } catch (e) {
+      reportError(e);
+    } finally {
+      assignBtn.disabled = false;
+    }
+  });
+
+  /** Kuryerni manzil tomon ~200 metr suradi. */
+  moveBtn.addEventListener('click', async () => {
+    if (!orderId) return;
+    moveBtn.disabled = true;
+    try {
+      const { store, db } = await firestoreReady();
+      // Manzil tomon qadam: taxminan 200 metr
+      const stepKm = 0.2;
+      const dLat = ADDRESS.lat - courierPos.lat;
+      const dLng = ADDRESS.lng - courierPos.lng;
+      const distKm = Math.sqrt((dLat * 111) ** 2 + (dLng * 83.4) ** 2);
+      const ratio = distKm > stepKm ? stepKm / distKm : 1;
+      courierPos = {
+        lat: Number((courierPos.lat + dLat * ratio).toFixed(6)),
+        lng: Number((courierPos.lng + dLng * ratio).toFixed(6))
+      };
+      const location = { ...courierPos, at: new Date().toISOString() };
+
+      await withTimeout(
+        Promise.all([
+          store.setDoc(store.doc(db, 'couriers', COURIER.id), { location }, { merge: true }),
+          store.updateDoc(store.doc(db, 'orders', orderId), { courierLocation: location })
+        ]),
+        TIMEOUT.write,
+        'Kuryer joylashuvi'
+      );
+      log(`Kuryer surildi: ${courierPos.lat}, ${courierPos.lng} (manzilgacha ${(distKm - stepKm > 0 ? distKm - stepKm : 0).toFixed(2)} km)`, 'ok');
+      refreshInfo();
+    } catch (e) {
+      reportError(e);
+    } finally {
+      moveBtn.disabled = false;
+    }
+  });
+
+  /**
+   * Xatoni ekranga chiqaradi va sababini izohlaydi.
+   * @param {*} e
+   */
+  function reportError(e) {
+    const code = e && e.code ? ` [${e.code}]` : '';
+    log(`Xato${code}: ${e.message || e}`, 'err');
+    if (String(e.code || '').includes('permission-denied')) {
+      log('Security Rules yozishga ruxsat bermayapti. Test uchun orders/couriers ga vaqtincha write ruxsatini oching.', 'muted');
+    }
+    if (String(e.message || '').includes('yozuvi') || String(e.code || '').includes('unavailable')) {
+      log('Firestore javob bermadi: projectId, baza yaratilgani va tarmoqni tekshiring.', 'muted');
+    }
+    console.error(e);
+  }
+
+  window.addEventListener('error', (e) => log(`Kutilmagan xato: ${e.message}`, 'err'));
+  window.addEventListener('unhandledrejection', (e) => {
+    const r = e.reason;
+    log(`Ushlanmagan xato: ${(r && (r.message || r.code)) || r}`, 'err');
+  });
+
+  uidInput.addEventListener('input', refreshInfo);
+  loadConfig();
+</script>
+</body>
+</html>

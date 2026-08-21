@@ -81,7 +81,6 @@
     import { applyI18n, t, LANGS, getLang } from './js/i18n.js';
     import { register, registerNotFound, start, navigate } from './js/router.js';
     import { emptyState, el, bottomSheet, toast } from './js/ui.js';
-    import { formatPhone } from './js/utils.js';
     import { initAuth } from './js/auth.js';
 
     initState();
@@ -91,43 +90,15 @@
     // mehmon uchun bosh sahifa ortiqcha so'rovsiz ochiladi.
     initAuth();
 
-    /**
-     * 0-bosqich uchun vaqtinchalik sahifa — bo'lim keyingi bosqichda to'ladi.
-     * @param {string} titleKey
-     * @param {string} icon
-     */
-    const stubPage = (titleKey, icon) => () => ({
-      render: () => el('div.page', {}, [
-        emptyState({ icon, title: t(titleKey), hint: t('app.emptyStage') })
-      ])
-    });
-
     register('/', () => import('./js/pages/menu.js'));
     register('/menu', () => import('./js/pages/menu.js'));
     register('/cart', () => import('./js/pages/cart.js'));
     register('/checkout', () => import('./js/pages/checkout.js'));
     register('/address', () => import('./js/pages/address.js'));
     register('/auth', () => import('./js/pages/auth.js'));
-    register('/orders', stubPage('order.title', '🧾'));
-    // Profil to'liq 5-bosqichda. Hozircha kirish/chiqish tugmasi bor —
-    // aks holda auth sahifasiga borish yo'li bo'lmaydi.
-    register('/profile', () => ({
-      render: () => {
-        const user = getState().user;
-        return el('div.page', {}, [
-          emptyState({
-            icon: '👤',
-            title: user ? formatPhone(user.phone) : t('profile.guest'),
-            hint: t('app.emptyStage'),
-            action: el('button.btn.btn--primary', {
-              text: user ? t('auth.logout') : t('auth.login'),
-              attrs: { type: 'button' },
-              on: { click: () => navigate('/auth') }
-            })
-          })
-        ]);
-      }
-    }));
+    register('/orders', () => import('./js/pages/order.js'));
+    register('/order/:id', () => import('./js/pages/order.js'));
+    register('/profile', () => import('./js/pages/profile.js'));
     registerNotFound(() => ({
       render: () => el('div.page', {}, [
         emptyState({ icon: '🤷', title: t('app.notFound'), hint: location.hash })
