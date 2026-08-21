@@ -1,0 +1,454 @@
+<!DOCTYPE html>
+<html lang="uz">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="robots" content="noindex">
+  <title>Seed — branches kolleksiyasiga demo filiallarni yozish</title>
+  <style>
+    :root {
+      color-scheme: light dark;
+      --bg: #f6f7f9;
+      --surface: #fff;
+      --border: #e3e6ec;
+      --text: #14171c;
+      --muted: #5b6270;
+      --brand: #e2662a;
+      --ok: #2f9e5b;
+      --err: #d94141;
+      --warn: #e0a32e;
+    }
+    @media (prefers-color-scheme: dark) {
+      :root {
+        --bg: #0f1115;
+        --surface: #171a21;
+        --border: #272c36;
+        --text: #eef1f6;
+        --muted: #a8b0bf;
+      }
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      padding: 32px 20px 64px;
+      background: var(--bg);
+      color: var(--text);
+      font: 16px/1.5 -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    }
+    main { max-width: 720px; margin: 0 auto; }
+    h1 { font-size: 22px; margin: 0 0 4px; }
+    .sub { color: var(--muted); font-size: 14px; margin-bottom: 24px; }
+    .card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 14px;
+      padding: 20px;
+      margin-bottom: 16px;
+    }
+    .card h2 { font-size: 15px; margin: 0 0 12px; text-transform: uppercase; letter-spacing: .04em; color: var(--muted); }
+    dl { display: grid; grid-template-columns: auto 1fr; gap: 6px 16px; margin: 0; font-size: 14px; }
+    dt { color: var(--muted); }
+    dd { margin: 0; font-family: ui-monospace, SFMono-Regular, Menlo, monospace; word-break: break-all; }
+    dd.bad { color: var(--err); font-weight: 600; }
+    dd.good { color: var(--ok); }
+    .actions { display: flex; flex-wrap: wrap; gap: 10px; margin-bottom: 16px; }
+    button {
+      font: inherit;
+      font-weight: 600;
+      min-height: 46px;
+      padding: 0 22px;
+      border: 0;
+      border-radius: 10px;
+      background: var(--brand);
+      color: #fff;
+      cursor: pointer;
+    }
+    button.secondary {
+      background: transparent;
+      color: var(--text);
+      box-shadow: inset 0 0 0 1px var(--border);
+    }
+    button:disabled { opacity: .5; cursor: not-allowed; }
+    .log {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 14px;
+      padding: 16px 20px;
+      font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+      font-size: 13px;
+      white-space: pre-wrap;
+      word-break: break-word;
+      min-height: 90px;
+    }
+    .log p { margin: 0 0 6px; }
+    .log .ok { color: var(--ok); }
+    .log .err { color: var(--err); font-weight: 600; }
+    .log .warn { color: var(--warn); }
+    .log .muted { color: var(--muted); }
+    .note {
+      border-left: 3px solid var(--brand);
+      padding-left: 14px;
+      color: var(--muted);
+      font-size: 14px;
+      margin: 0 0 10px;
+    }
+    code { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; }
+  </style>
+</head>
+<body>
+<main>
+  <h1>Demo filiallarni Firestore'ga yozish</h1>
+  <p class="sub">Bir martalik vosita. <code>docs/seed-branches.json</code> → <code>branches/{id}</code></p>
+
+  <div class="card">
+    <h2>Holat</h2>
+    <dl>
+      <dt>projectId</dt><dd id="infoProject">o'qilmoqda...</dd>
+      <dt>apiKey</dt><dd id="infoKey">—</dd>
+      <dt>Kolleksiya</dt><dd>branches</dd>
+      <dt>Manba</dt><dd>../docs/seed-branches.json</dd>
+      <dt>Service worker</dt><dd id="infoSw">tekshirilmoqda...</dd>
+    </dl>
+  </div>
+
+  <div class="card">
+    <h2>Diqqat</h2>
+    <p class="note">
+      Har bir filial <strong>alohida hujjat</strong> sifatida yoziladi
+      (<code>branches/markaziy</code>, <code>branches/chilonzor</code>). Shu id'li
+      hujjat allaqachon bo'lsa, uning mazmuni <strong>butunlay almashtiriladi</strong>.
+      Ro'yxatda yo'q filiallarga tegilmaydi.
+    </p>
+    <p class="note">
+      Zonalar tartibi muhim: <code>findZone()</code> birinchi mos kelganini oladi,
+      shuning uchun faylda "Yaqin zona" doim "Uzoq zona" dan oldin turadi.
+    </p>
+    <p class="note">
+      Agar <code>projectId</code> o'rnida <code>FIREBASE_PROJECT</code> ko'rinsa, sahifaga
+      eski <code>config.js</code> keshdan kelgan. "Kesh va SW ni tozalash" tugmasini bosing.
+    </p>
+  </div>
+
+  <div class="actions">
+    <button id="runBtn" type="button" disabled>Yuklash</button>
+    <button id="clearBtn" class="secondary" type="button">Kesh va SW ni tozalash</button>
+  </div>
+
+  <div class="log" id="log" role="status" aria-live="polite"></div>
+</main>
+
+<script type="module">
+  /*
+   * Mantiq `tools/seed.html` bilan bir xil: config keshni chetlab o'tib
+   * o'qiladi, har bosqichga timeout qo'yilgan, xatolar jim qolmaydi.
+   * Farqi — bu yerda bitta hujjat emas, kolleksiyaga bir nechta hujjat
+   * yoziladi (har filial alohida).
+   */
+
+  const logEl = document.getElementById('log');
+  const runBtn = document.getElementById('runBtn');
+  const clearBtn = document.getElementById('clearBtn');
+
+  /** Har bir bosqich uchun kutish chegarasi (ms). */
+  const TIMEOUT = {
+    fetch: 15000,
+    sdk: 20000,
+    write: 20000
+  };
+
+  /** @type {?object} yangi o'qilgan config moduli */
+  let cfgModule = null;
+  /** Takroriy bosishda initializeApp qayta chaqirilmasin. */
+  let firestore = null;
+
+  /**
+   * Ekranga bitta qator yozadi.
+   * @param {string} text
+   * @param {'info'|'ok'|'err'|'warn'|'muted'} [kind='info']
+   */
+  function log(text, kind = 'info') {
+    const time = new Date().toLocaleTimeString('uz-UZ', { hour12: false });
+    const line = document.createElement('p');
+    if (kind !== 'info') line.className = kind;
+    line.textContent = `${time}  ${text}`;
+    logEl.append(line);
+    logEl.scrollTop = logEl.scrollHeight;
+  }
+
+  /**
+   * Va'da belgilangan vaqtda tugamasa — xato beradi.
+   * Diqqat: asosiy amal bekor qilinmaydi, faqat kutish to'xtaydi.
+   * @template T
+   * @param {Promise<T>} promise
+   * @param {number} ms
+   * @param {string} label - xabarda ko'rinadigan bosqich nomi
+   * @returns {Promise<T>}
+   */
+  function withTimeout(promise, ms, label) {
+    let timer = null;
+    const guard = new Promise((_, reject) => {
+      timer = setTimeout(
+        () => reject(new Error(`${label}: ${Math.round(ms / 1000)} soniyada javob bo'lmadi`)),
+        ms
+      );
+    });
+    return Promise.race([promise, guard]).finally(() => clearTimeout(timer));
+  }
+
+  /**
+   * Configdagi kamchilikni topadi (bo'sh yoki placeholder qiymatlar).
+   * @param {object} cfg
+   * @returns {?string} muammo tavsifi, muammo bo'lmasa null
+   */
+  function configProblem(cfg) {
+    if (!cfg || typeof cfg !== 'object') return 'FIREBASE_CONFIG eksport qilinmagan';
+    const required = ['apiKey', 'authDomain', 'projectId', 'appId'];
+    const missing = required.filter((key) => !cfg[key]);
+    if (missing.length) return `to'ldirilmagan maydonlar: ${missing.join(', ')}`;
+    const placeholders = Object.entries(cfg)
+      .filter(([, value]) => /^(FIREBASE_|YOUR_)/.test(String(value)))
+      .map(([key]) => key);
+    if (placeholders.length) {
+      return `placeholder qiymat qolgan: ${placeholders.join(', ')} — eski config.js keshdan kelgan`;
+    }
+    return null;
+  }
+
+  /**
+   * Bitta filial yozuvini tekshiradi.
+   * @param {object} branch
+   * @param {number} index
+   * @returns {?string} muammo tavsifi
+   */
+  function branchProblem(branch, index) {
+    const where = `#${index + 1}`;
+    if (!branch || typeof branch !== 'object') return `${where}: obyekt emas`;
+    if (!branch.id) return `${where}: id yo'q`;
+    if (!branch.name) return `${branch.id}: nom yo'q`;
+    if (typeof branch.lat !== 'number' || typeof branch.lng !== 'number') {
+      return `${branch.id}: lat/lng raqam emas`;
+    }
+    if (!Array.isArray(branch.zones) || !branch.zones.length) {
+      return `${branch.id}: zona yo'q`;
+    }
+    for (const zone of branch.zones) {
+      if (!Array.isArray(zone.polygon) || zone.polygon.length < 3) {
+        return `${branch.id} / ${zone.name || '?'}: polygon kamida 3 nuqtadan iborat bo'lsin`;
+      }
+      const bad = zone.polygon.find((p) => !Array.isArray(p) || p.length !== 2 ||
+        typeof p[0] !== 'number' || typeof p[1] !== 'number');
+      if (bad) return `${branch.id} / ${zone.name || '?'}: polygon nuqtasi [lat, lng] emas`;
+      if (typeof zone.deliveryPrice !== 'number' || typeof zone.minOrder !== 'number') {
+        return `${branch.id} / ${zone.name || '?'}: deliveryPrice yoki minOrder raqam emas`;
+      }
+    }
+    return null;
+  }
+
+  /** Sahifani service worker boshqarayotganini ekranga chiqaradi. */
+  function reportServiceWorker() {
+    const swEl = document.getElementById('infoSw');
+    if (!('serviceWorker' in navigator)) {
+      swEl.textContent = 'qo\'llab-quvvatlanmaydi';
+      return;
+    }
+    const controlled = Boolean(navigator.serviceWorker.controller);
+    swEl.textContent = controlled ? 'sahifani boshqarmoqda (kesh xavfi bor)' : 'yo\'q';
+    swEl.className = controlled ? 'bad' : 'good';
+    if (controlled) {
+      log('Sahifani service worker boshqarmoqda — config kesh chetlab o\'tilgan holda o\'qiladi.', 'warn');
+    }
+  }
+
+  /** Configni keshni chetlab o'tib o'qiydi va ekranga chiqaradi. */
+  async function loadConfig() {
+    const projectEl = document.getElementById('infoProject');
+    const keyEl = document.getElementById('infoKey');
+    try {
+      // Har safar yangi URL — brauzer keshi ham, SW keshi ham chetlab o'tiladi
+      cfgModule = await withTimeout(
+        import(`../js/config.js?nocache=${Date.now()}`),
+        TIMEOUT.fetch,
+        'config.js yuklanmadi'
+      );
+      const cfg = cfgModule.FIREBASE_CONFIG;
+      const problem = configProblem(cfg);
+
+      projectEl.textContent = (cfg && cfg.projectId) || '—';
+      keyEl.textContent = cfg && cfg.apiKey
+        ? `${String(cfg.apiKey).slice(0, 10)}…${String(cfg.apiKey).slice(-4)}`
+        : '—';
+
+      if (problem) {
+        projectEl.className = 'bad';
+        log(`Config yaroqsiz: ${problem}`, 'err');
+        log('"Kesh va SW ni tozalash" tugmasini bosing, so\'ng sahifani qayta yuklang.', 'muted');
+        runBtn.disabled = true;
+        return;
+      }
+
+      projectEl.className = 'good';
+      log(`Config o'qildi: ${cfg.projectId}`, 'ok');
+      log('Tayyor. "Yuklash" tugmasini bosing.', 'muted');
+      runBtn.disabled = false;
+    } catch (e) {
+      projectEl.className = 'bad';
+      projectEl.textContent = 'xato';
+      log(`config.js o'qilmadi: ${e.message || e}`, 'err');
+      runBtn.disabled = true;
+    }
+  }
+
+  /** Service worker va barcha keshlarni o'chiradi. */
+  clearBtn.addEventListener('click', async () => {
+    clearBtn.disabled = true;
+    try {
+      if ('serviceWorker' in navigator) {
+        const regs = await navigator.serviceWorker.getRegistrations();
+        await Promise.all(regs.map((r) => r.unregister()));
+        log(`Service worker o'chirildi: ${regs.length} ta`, 'ok');
+      }
+      if ('caches' in window) {
+        const keys = await caches.keys();
+        await Promise.all(keys.map((k) => caches.delete(k)));
+        log(`Kesh tozalandi: ${keys.join(', ') || 'bo\'sh'}`, 'ok');
+      }
+      log('Sahifa 2 soniyadan keyin qayta yuklanadi...', 'muted');
+      setTimeout(() => location.reload(), 2000);
+    } catch (e) {
+      log(`Tozalashda xato: ${e.message || e}`, 'err');
+      clearBtn.disabled = false;
+    }
+  });
+
+  runBtn.addEventListener('click', async () => {
+    runBtn.disabled = true;
+    try {
+      const { FIREBASE_CONFIG, FIREBASE_SDK } = cfgModule;
+
+      // Yozishdan oldin configni yana bir bor tekshiramiz
+      const problem = configProblem(FIREBASE_CONFIG);
+      if (problem) throw new Error(`Config yaroqsiz — ${problem}`);
+
+      // 1. Demo faylni o'qiymiz
+      log('docs/seed-branches.json o\'qilmoqda...');
+      const res = await withTimeout(
+        fetch(`../docs/seed-branches.json?nocache=${Date.now()}`, { cache: 'no-store' }),
+        TIMEOUT.fetch,
+        'JSON so\'rovi'
+      );
+      if (!res.ok) throw new Error(`Fayl o'qilmadi: HTTP ${res.status}`);
+      const seed = await res.json();
+
+      const branches = Array.isArray(seed.branches) ? seed.branches : [];
+      if (!branches.length) throw new Error('Faylda filial yo\'q');
+
+      // 2. Har bir yozuvni tekshiramiz — yarim yozib qo'yishdan yaxshiroq
+      const problems = branches.map(branchProblem).filter(Boolean);
+      if (problems.length) {
+        problems.forEach((p) => log(`Yaroqsiz yozuv: ${p}`, 'err'));
+        throw new Error(`${problems.length} ta yozuv yaroqsiz — hech narsa yozilmadi`);
+      }
+
+      const ids = branches.map((b) => b.id);
+      const duplicates = ids.filter((id, i) => ids.indexOf(id) !== i);
+      if (duplicates.length) throw new Error(`id takrorlanmoqda: ${duplicates.join(', ')}`);
+
+      branches.forEach((b) => {
+        const zones = b.zones.map((z) => `${z.name} ${z.deliveryPrice}/${z.minOrder}`).join(', ');
+        log(`Topildi: ${b.id} — ${b.name} (${b.zones.length} zona: ${zones})`, 'ok');
+      });
+
+      // 3. Tasdiq so'raymiz
+      const answer = window.confirm(
+        `Rostdan yozilsinmi?\n\n` +
+        `Loyiha: ${FIREBASE_CONFIG.projectId}\n` +
+        `Kolleksiya: branches\n` +
+        `Hujjatlar: ${ids.join(', ')}\n\n` +
+        `Diqqat: shu id'li hujjatlarning eski mazmuni butunlay almashtiriladi.`
+      );
+      if (!answer) {
+        log('Bekor qilindi — hech narsa yozilmadi.', 'muted');
+        return;
+      }
+
+      // 4. Firebase SDK (faqat app + firestore, Storage ishlatilmaydi)
+      if (!firestore) {
+        log('Firebase SDK yuklanmoqda...');
+        const [appSdk, storeSdk] = await withTimeout(
+          Promise.all([import(FIREBASE_SDK.app), import(FIREBASE_SDK.firestore)]),
+          TIMEOUT.sdk,
+          'SDK yuklash'
+        );
+        const app = appSdk.initializeApp(FIREBASE_CONFIG);
+        firestore = { store: storeSdk, db: storeSdk.getFirestore(app) };
+        log(`SDK tayyor, loyiha: ${app.options.projectId}`, 'ok');
+      }
+      const { store, db } = firestore;
+
+      // 5. Har bir filialni alohida hujjat qilib yozamiz.
+      // Bittasi yiqilsa ham qolganlari yoziladi — natija oxirida jamlanadi.
+      const failed = [];
+      for (const branch of branches) {
+        const { id, ...payload } = branch;
+        log(`branches/${id} yozilmoqda...`);
+        try {
+          await withTimeout(
+            store.setDoc(store.doc(db, 'branches', id), {
+              ...payload,
+              updatedAt: store.serverTimestamp()
+            }),
+            TIMEOUT.write,
+            `branches/${id} yozuvi`
+          );
+          log(`branches/${id} yozildi`, 'ok');
+        } catch (e) {
+          const code = e && e.code ? ` [${e.code}]` : '';
+          log(`branches/${id} YOZILMADI${code}: ${e.message || e}`, 'err');
+          failed.push(id);
+          console.error(e);
+        }
+      }
+
+      if (failed.length) {
+        log(`Tugadi: ${branches.length - failed.length} ta yozildi, ${failed.length} ta xato (${failed.join(', ')}).`, 'err');
+      } else {
+        log(`Tayyor. ${branches.length} ta filial yozildi.`, 'ok');
+        log('Firestore konsolida va ilovaning "Olib ketish" bo\'limida tekshirib ko\'ring.', 'muted');
+      }
+    } catch (e) {
+      const code = e && e.code ? ` [${e.code}]` : '';
+      log(`Xato${code}: ${e.message || e}`, 'err');
+
+      if (String(e.message || '').includes('yozuvi')) {
+        log('Firestore tarmoq uzilganda xato bermaydi — yozuvni ichida navbatga qo\'yib, cheksiz kutadi. Sabablari:', 'muted');
+        log('  1) projectId noto\'g\'ri yoki bunday loyiha yo\'q (config keshdan kelgan)', 'muted');
+        log('  2) Firestore bazasi hali yaratilmagan — konsolda "Create database" bosing', 'muted');
+        log('  3) tarmoq yoki brauzer kengaytmasi so\'rovni bloklayapti', 'muted');
+      }
+      if (String(e.code || '').includes('permission-denied')) {
+        log('Security Rules yozishga ruxsat bermayapti. Vaqtincha branches uchun write ruxsatini oching yoki konsoldan qo\'lda kiriting.', 'muted');
+      }
+      if (String(e.code || '').includes('unavailable')) {
+        log('Firestore serveriga ulanib bo\'lmadi. Internet va loyiha sozlamalarini tekshiring.', 'muted');
+      }
+      console.error(e);
+    } finally {
+      runBtn.disabled = false;
+    }
+  });
+
+  // Hech qanday xato jim qolmasin
+  window.addEventListener('error', (e) => {
+    log(`Kutilmagan xato: ${e.message}`, 'err');
+  });
+  window.addEventListener('unhandledrejection', (e) => {
+    const reason = e.reason;
+    log(`Ushlanmagan xato: ${(reason && (reason.message || reason.code)) || reason}`, 'err');
+  });
+
+  reportServiceWorker();
+  loadConfig();
+</script>
+</body>
+</html>
