@@ -152,7 +152,8 @@ Render → servis → **Environment** → **Add Environment Variable**.
 | `ALLOWED_ORIGINS` | CORS uchun frontend manzillari, vergul bilan: `https://unutilmastam.github.io` |
 | `FIREBASE_PROJECT_ID` | xizmat akkaunti JSON dagi `project_id` |
 | `FIREBASE_CLIENT_EMAIL` | JSON dagi `client_email` |
-| `FIREBASE_PRIVATE_KEY` | JSON dagi `private_key` — ko'p qatorli, `\n` bilan yozing va qo'shtirnoq ichiga oling |
+| `FIREBASE_PRIVATE_KEY_BASE64` | JSON dagi `private_key` base64 ga o'girilgan holda — **tavsiya etiladi**, pastdagi bo'limga qarang |
+| `FIREBASE_PRIVATE_KEY` | O'sha kalitning oddiy PEM varianti (`\n` bilan). Faqat base64 qo'yilmagan bo'lsa ishlatiladi |
 | `ADMIN_UIDS` | status o'zgartira oladigan uid'lar, vergul bilan |
 
 **SMS (ixtiyoriy, lekin production uchun kerak):**
@@ -205,6 +206,46 @@ Oqibatlari va ular qanday hal qilingani:
   `js/config.js` da `AUTH_MODE = 'test'` qilib qo'yish mumkin — kirish
   test rejimida ishlaydi (kod `000000`), lekin buyurtma berish baribir
   servisni talab qiladi.
+
+### 4a. Private key'ni base64 ko'rinishida qo'yish
+
+PEM kalit ko'p qatorli, environment o'zgaruvchisi esa bir qatorli — shu
+sababli u Render'da eng ko'p muammo tug'diradigan qiymat:
+
+| Nima bo'lgan | Xato |
+| --- | --- |
+| `\n` haqiqiy qator ko'chishiga aylanmagan | `error:1E08010C:DECODER routines::unsupported` |
+| Qo'shtirnoq qiymat ichida qolib ketgan | `Invalid PEM formatted message` |
+
+**Yechim: kalitni base64 ga o'giring.** Base64 da maxsus belgi ham,
+qator ko'chishi ham yo'q, shuning uchun uni hech qanday qochirishsiz
+(escaping) qo'yish mumkin.
+
+Xizmat akkaunti JSON faylidan (`key.json`):
+
+```bash
+node -e "console.log(Buffer.from(require('./key.json').private_key).toString('base64'))"
+```
+
+`.pem` fayldan:
+
+```bash
+base64 -w0 private-key.pem      # macOS: base64 -i private-key.pem
+```
+
+Chiqqan uzun satrni Render'da **`FIREBASE_PRIVATE_KEY_BASE64`** ga
+qo'ying — qo'shtirnoqsiz, o'zgartirmasdan. `FIREBASE_PRIVATE_KEY` ni
+bo'sh qoldirsangiz ham bo'ladi.
+
+Servis ikkalasini ham tushunadi: **`FIREBASE_PRIVATE_KEY_BASE64` bo'lsa
+o'sha ishlatiladi**, bo'lmasa `FIREBASE_PRIVATE_KEY` dagi `\n` qator
+ko'chishiga aylantiriladi. Har ikki holatda ham qiymatni o'rab turgan
+qo'shtirnoq olib tashlanadi.
+
+Kalit noto'g'ri bo'lsa servis buni **ishga tushishda** aytadi —
+`/api/health` javobidagi `problems` ro'yxatida
+`FIREBASE_PRIVATE_KEY PEM shaklida emas...` satri chiqadi, tushunarsiz
+OpenSSL xatosini kutib o'tirishga hojat yo'q.
 
 ### 5. Firestore indekslari
 
