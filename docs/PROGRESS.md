@@ -3,7 +3,7 @@
 > Har seans boshida shu faylni o'qi. Faqat "Joriy bosqich" deb belgilangan
 > ishni bajar. Boshqa bosqichlarga o'tma. Tugagach shu faylni yangila.
 
-**Joriy bosqich: 3**
+**Joriy bosqich: 4**
 
 ---
 
@@ -192,7 +192,7 @@ Izoh:
 ---
 
 ## Bosqich 3 — manzil va zona
-Status: **joriy**
+Status: **bajarildi**
 
 `js/pages/address.js` — Yandex Maps JS API
 - Marker surish, reverse geocode, autocomplete
@@ -201,11 +201,56 @@ Status: **joriy**
 - Saqlangan manzillar CRUD
 
 Izoh:
+- `js/pages/address.js` — Yandex Maps JS API 2.1. Xarita, surilishi mumkin
+  bo'lgan marker, xaritani bosish, `SuggestView` autocomplete, reverse
+  geocode (400 ms debounce), zona tekshiruvi, tafsilot formasi va
+  saqlangan manzillar ro'yxati.
+- **Skript dangasa yuklanadi.** `loadYmaps()` `<script>` ni faqat manzil
+  sahifasi ochilganda `<head>` ga qo'shadi; menyu, savat va checkout'da
+  xarita umuman so'ralmaydi (test bilan tasdiqlangan: 0 ta so'rov).
+  Skript bir marta yuklanib keshlanadi, 12 soniyalik timeout bor.
+- **Xarita yuklanmasa ilova buzilmaydi.** Kalit ishlamasa, skript
+  bloklansa yoki tarmoq yo'q bo'lsa — "Xaritani yuklab bo'lmadi, manzilni
+  qo'lda kiriting" ogohlantirishi va oddiy forma chiqadi; qidiruv maydoni
+  oddiy "Ko'cha va uy raqami" maydoniga aylanadi. Manzil koordinatasiz
+  saqlanadi, zona aniqlanmaydi va zaxira narx ishlatiladi.
+- **Zona → narx.** `findZone()` `pointInPolygon` bilan filial zonalarini
+  tekshiradi; topilgan zona `address.zone` ga yoziladi va `calcTotals()`
+  yetkazish narxi hamda minimal summani o'shandan oladi (topilmasa
+  `config.js` dagi zaxira qiymatlar). Zonadan tashqaridagi manzilni
+  tasdiqlab bo'lmaydi — tugma o'chiriladi.
+- **Manzillar CRUD**: mehmon rejimida `state.addresses` (localStorage),
+  foydalanuvchi kirgach `users/{uid}/addresses` — `db.js` da
+  `getAddresses/addAddress/updateAddress/deleteAddress` yozildi va
+  4-bosqichda auth ulangach o'zi ishlay boshlaydi.
+- `checkout.js` dagi vaqtinchalik qo'lda kiritish oynasi olib tashlandi —
+  endi "Manzilni kiritish" tugmasi `#/address` sahifasiga olib boradi va
+  bo'limda zona nomi bilan yetkazish narxi ko'rsatiladi.
+- Yandex Maps `uz_UZ` tilini qo'llab-quvvatlamaydi: o'zbek interfeysida
+  xarita va manzillar ruscha (`ru_RU`), inglizchada `en_US`.
+- `config.js`: `YANDEX_MAPS_KEY` (haqiqiy kalit), `YANDEX_MAPS_VERSION`,
+  `YANDEX_MAPS_LANG`, `DEFAULT_CENTER` (Toshkent).
+- `sw.js` `VERSION = 'v5'`, `address.js` app shell ro'yxatida. Xarita
+  skripti tashqi domendan kelgani uchun SW unga tegmaydi.
+- Bu bosqichda qilinmadi: joylashuvni avtomatik aniqlash tugmasi
+  (`geolocationControl` xaritaning o'zida bor), manzilni xarita ustida
+  ko'rsatuvchi doimiy pin animatsiyasi, filiallarni masofa bo'yicha
+  saralash (checkout'dagi ro'yxat hozircha tartibsiz).
+- Tekshirildi (Chromium 390×844): **dangasa yuklash** — menyu/savatda 0 ta
+  so'rov, manzil sahifasida aynan 1 ta (kalit bilan); **xaritasiz rejim**
+  (bu muhitda CDN haqiqatan bloklangan) — ogohlantirish chiqdi, qo'lda
+  kiritilgan manzil saqlandi, konsolda xato yo'q; **xarita rejimi**
+  (soxta `ymaps` bilan) — marker surilganda reverse geocode ishladi,
+  zona ichida "Markaz · 12 000 so'm · min 40 000", tashqarida "zonadan
+  tashqarida" va tugma o'chdi, autocomplete tanlovi manzilni yangiladi,
+  saqlangach savatda yetkazish 12 000 bo'ldi (zaxira 15 000 emas),
+  saqlangan manzil ro'yxatda ko'rindi va o'chirildi, sahifadan chiqqanda
+  `map.destroy()` chaqirildi.
 
 ---
 
 ## Bosqich 4 — auth
-Status: boshlanmagan
+Status: **joriy**
 
 `js/pages/auth.js`, `js/auth.js`
 - +998 mask, OTP 6 katak, 60 sek taymer

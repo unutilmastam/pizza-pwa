@@ -11,13 +11,13 @@
  */
 
 import { t } from '../i18n.js';
-import { el, bottomSheet, modal, toast, skeleton } from '../ui.js';
+import { el, modal, toast, skeleton } from '../ui.js';
 import { formatPrice, clamp, haptic } from '../utils.js';
 import { APP } from '../config.js';
 import { getBranches } from '../db.js';
 import { navigate, back } from '../router.js';
 import {
-  getState, setOrderType, setAddress, setBranch, setCheckout, setOrderDraft
+  getState, setOrderType, setBranch, setCheckout, setOrderDraft
 } from '../state.js';
 import { calcTotals } from './cart.js';
 
@@ -34,72 +34,6 @@ function addressLine(address) {
     address.floor && `${t('address.floor')} ${address.floor}`
   ].filter(Boolean).join(', ');
   return extra ? `${address.address}, ${extra}` : address.address;
-}
-
-/**
- * Manzil kiritish oynasi.
- *
- * 3-bosqichda bu forma Yandex Maps xaritasi bilan almashtiriladi
- * (marker, reverse geocode, zona tekshiruvi). Hozircha qo'lda kiritiladi.
- *
- * @param {?object} current
- * @param {(address: object) => void} onSave
- */
-function openAddressSheet(current, onSave) {
-  const field = (label, key, opts = {}) => {
-    const input = el('input.input', {
-      attrs: {
-        type: opts.type || 'text',
-        inputmode: opts.inputmode || null,
-        placeholder: opts.placeholder || '',
-        value: (current && current[key]) || ''
-      },
-      dataset: { key }
-    });
-    return el('label.field', {}, [
-      el('span.field__label', { text: label }),
-      input
-    ]);
-  };
-
-  const form = el('div.form', {}, [
-    field(t('checkout.street'), 'address', { placeholder: 'Amir Temur ko\'chasi, 12' }),
-    el('div.form__row', {}, [
-      field(t('address.apartment'), 'apartment', { inputmode: 'numeric' }),
-      field(t('address.entrance'), 'entrance', { inputmode: 'numeric' })
-    ]),
-    el('div.form__row', {}, [
-      field(t('address.floor'), 'floor', { inputmode: 'numeric' }),
-      field(t('address.intercom'), 'intercom')
-    ]),
-    field(t('address.landmark'), 'comment')
-  ]);
-
-  const save = el('button.btn.btn--primary.btn--lg.btn--block', {
-    text: t('common.save'),
-    attrs: { type: 'button' },
-    on: {
-      click: () => {
-        const values = {};
-        form.querySelectorAll('input').forEach((input) => {
-          values[input.dataset.key] = input.value.trim();
-        });
-        if (!values.address) {
-          toast(t('checkout.addressRequired'), { type: 'error' });
-          return;
-        }
-        // lat/lng 3-bosqichda xaritadan keladi
-        onSave({ ...current, ...values, label: 'Uy' });
-        sheet.close();
-      }
-    }
-  });
-
-  const sheet = bottomSheet({
-    title: t('checkout.address'),
-    content: form,
-    footer: save
-  });
 }
 
 /**
@@ -250,6 +184,7 @@ export function render() {
 
     // --- 2. Manzil yoki filial
     if (form.orderType === 'delivery') {
+      const zone = form.address && form.address.zone;
       sections.append(section(t('checkout.address'), [
         form.address
           ? el('div.row.row--between.addr', {}, [
@@ -257,14 +192,20 @@ export function render() {
             el('button.btn.btn--ghost', {
               text: t('common.edit'),
               attrs: { type: 'button' },
-              on: { click: () => openAddressSheet(form.address, saveAddress) }
+              on: { click: () => navigate('/address') }
             })
           ])
           : el('button.btn.btn--outline.btn--block', {
             text: t('checkout.addressAdd'),
             attrs: { type: 'button' },
-            on: { click: () => openAddressSheet(null, saveAddress) }
+            on: { click: () => navigate('/address') }
+          }),
+        zone
+          ? el('p.hint', {
+            text: `${t('address.zone')}: ${zone.name} · ` +
+              `${t('cart.delivery')} ${formatPrice(totals.delivery)}`
           })
+          : null
       ]));
     } else {
       const host = el('div.branches');
@@ -419,16 +360,6 @@ export function render() {
       attrs: { type: 'button' },
       on: { click: () => submit(totals) }
     }));
-  }
-
-  /**
-   * Manzil saqlanganda.
-   * @param {object} address
-   */
-  function saveAddress(address) {
-    form.address = address;
-    setAddress(address);
-    rebuild();
   }
 
   /**

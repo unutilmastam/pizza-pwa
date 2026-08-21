@@ -35,7 +35,16 @@ let unsubscribe = null;
  *            minOrderMet: boolean, freeDelivery: boolean}}
  */
 export function calcTotals(state = getState()) {
-  const { price, minOrder, freeFrom } = APP.delivery;
+  // Manzil zonasi aniqlangan bo'lsa narx va minimal summa o'shandan olinadi
+  // (3-bosqich), aks holda config.js dagi zaxira qiymatlar ishlatiladi.
+  const zone = state.address && state.address.zone;
+  const price = zone && Number.isFinite(zone.deliveryPrice)
+    ? zone.deliveryPrice
+    : APP.delivery.price;
+  const minOrder = zone && Number.isFinite(zone.minOrder)
+    ? zone.minOrder
+    : APP.delivery.minOrder;
+  const { freeFrom } = APP.delivery;
   const subtotal = state.cart.reduce((sum, i) => sum + i.unitPrice * i.qty, 0);
   const isPickup = state.orderType === 'pickup';
   const freeDelivery = isPickup || subtotal >= freeFrom;
@@ -46,6 +55,7 @@ export function calcTotals(state = getState()) {
     delivery,
     discount: 0, // promokod chegirmasi serverda hisoblanadi
     total: subtotal + delivery,
+    zone: zone || null,
     minOrder: isPickup ? 0 : minOrder,
     freeFrom,
     minOrderMet: isPickup || subtotal >= minOrder,

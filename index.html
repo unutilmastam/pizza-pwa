@@ -100,6 +100,7 @@
     register('/menu', () => import('./js/pages/menu.js'));
     register('/cart', () => import('./js/pages/cart.js'));
     register('/checkout', () => import('./js/pages/checkout.js'));
+    register('/address', () => import('./js/pages/address.js'));
     register('/orders', stubPage('order.title', '🧾'));
     register('/profile', stubPage('profile.title', '👤'));
     registerNotFound(() => ({

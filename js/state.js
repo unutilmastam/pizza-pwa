@@ -38,6 +38,12 @@ function emptyState() {
     guest: true,
     /** @type {?object} tanlangan yetkazish manzili */
     address: null,
+    /**
+     * @type {object[]} saqlangan manzillar.
+     * Mehmon rejimida shu yerda yashaydi; foydalanuvchi kirgach
+     * `users/{uid}/addresses` bilan ishlanadi (4-bosqich).
+     */
+    addresses: [],
     /** @type {?string} tanlangan filial (pickup yoki zona bo'yicha) */
     branchId: null,
     /** delivery | pickup */
@@ -175,6 +181,40 @@ export function updateUser(patch) {
  */
 export function setAddress(address) {
   state.address = address || null;
+  commit();
+}
+
+/**
+ * Saqlangan manzillar ro'yxatini butunlay almashtiradi
+ * (Firestore'dan yuklangach shu ishlatiladi).
+ * @param {object[]} list
+ */
+export function setAddresses(list) {
+  state.addresses = Array.isArray(list) ? list : [];
+  commit();
+}
+
+/**
+ * Manzilni saqlangan ro'yxatga qo'shadi yoki mavjudini yangilaydi.
+ * @param {object} address - `id` bo'lsa yangilanadi, bo'lmasa qo'shiladi
+ * @returns {object} saqlangan manzil (id bilan)
+ */
+export function saveAddress(address) {
+  const item = { ...address, id: address.id || uid() };
+  const index = state.addresses.findIndex((a) => a.id === item.id);
+  if (index === -1) state.addresses.push(item);
+  else state.addresses[index] = item;
+  commit();
+  return deepClone(item);
+}
+
+/**
+ * Saqlangan manzilni o'chiradi. Tanlangan manzil o'chirilsa — tanlov bekor.
+ * @param {string} addressId
+ */
+export function removeAddress(addressId) {
+  state.addresses = state.addresses.filter((a) => a.id !== addressId);
+  if (state.address && state.address.id === addressId) state.address = null;
   commit();
 }
 
