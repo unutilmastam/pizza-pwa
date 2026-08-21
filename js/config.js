@@ -28,8 +28,22 @@ export const FIREBASE_SDK = {
 /** Node servis (Render) bazaviy manzili. */
 export const API_BASE = 'https://pizza-api.onrender.com';
 
-/** Yandex Maps JS API kaliti — 3-bosqichda ishlatiladi. */
-export const YANDEX_MAPS_KEY = 'YANDEX_MAPS_API_KEY';
+/**
+ * Yandex Maps JS API 2.1.
+ * Skript FAQAT manzil sahifasi ochilganda yuklanadi (`js/pages/address.js`
+ * dagi `loadYmaps()`), bosh sahifada umuman so'ralmaydi.
+ */
+export const YANDEX_MAPS_KEY = 'b7ccb8db-fd98-49a9-acaf-b518fe364498';
+export const YANDEX_MAPS_VERSION = '2.1';
+
+/**
+ * Xarita tili. Yandex Maps `uz_UZ` ni qo'llab-quvvatlamaydi, shuning uchun
+ * o'zbek interfeysida ham manzillar ruscha ko'rinishda keladi.
+ */
+export const YANDEX_MAPS_LANG = { uz: 'ru_RU', ru: 'ru_RU', en: 'en_US' };
+
+/** Toshkent markazi — xarita boshlang'ich nuqtasi. */
+export const DEFAULT_CENTER = [41.311081, 69.240562];
 
 /** Ilova konstantalari. */
 export const APP = {

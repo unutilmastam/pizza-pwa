@@ -1697,6 +1697,103 @@ body:has(.cart-cta) .toasts {
   padding: var(--sp-3);
 }
 
+/* --------------------------------------------------- 9. MANZIL SAHIFASI */
+
+.address {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-3);
+}
+
+.addr-search .input {
+  padding-left: var(--sp-4);
+}
+
+/* Yandex Maps konteyneri */
+.map {
+  position: relative;
+  height: 300px;
+  border-radius: var(--r-lg);
+  background: var(--surface-2);
+  overflow: hidden;
+}
+
+.map__loading {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  color: var(--text-3);
+  font-size: var(--fs-sm);
+}
+
+/* Xarita yuklanmagan holat — qo'lda kiritish rejimi */
+.map--failed {
+  height: auto;
+  background: rgba(224, 163, 46, 0.12);
+  border: 1px solid var(--warning);
+}
+
+.map__fallback {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-1);
+  padding: var(--sp-4);
+}
+
+.map__fallback-title {
+  font-weight: 600;
+  font-size: var(--fs-sm);
+}
+
+/* Zona ma'lumoti */
+
+.zone-info__box {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: var(--sp-3) var(--sp-4);
+  border-radius: var(--r-md);
+  background: var(--surface);
+  box-shadow: var(--shadow-1);
+}
+
+.zone-info__box--bad {
+  background: rgba(217, 65, 65, 0.12);
+  box-shadow: none;
+  color: var(--danger);
+  font-weight: 600;
+  font-size: var(--fs-sm);
+}
+
+.zone-info__name {
+  font-size: var(--fs-sm);
+  font-weight: 700;
+}
+
+/* Saqlangan manzillar */
+
+.saved-addr .section-title {
+  font-size: var(--fs-lg);
+  margin: var(--sp-2) 0 var(--sp-2);
+}
+
+.saved-row {
+  gap: var(--sp-2);
+}
+
+.saved-row__pick {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  text-align: left;
+  font: inherit;
+  color: inherit;
+  min-height: var(--tap);
+  padding: 0;
+}
+
 .branches .opt-row__name {
   display: flex;
   flex-direction: column;

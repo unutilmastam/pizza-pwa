@@ -188,19 +188,32 @@ export async function getBonusHistory(uid, limit) {}
 
 /**
  * Foydalanuvchining saqlangan manzillari.
+ * Mehmon rejimida bu chaqirilmaydi — manzillar `state.addresses` da turadi.
  * @param {string} uid
  * @returns {Promise<object[]>}
  */
-export async function getAddresses(uid) {}
+export async function getAddresses(uid) {
+  if (!uid) return [];
+  const { dbx, sdk } = await getFirebase();
+  const snap = await sdk.getDocs(sdk.collection(dbx, 'users', uid, 'addresses'));
+  return snap.docs.map((d) => ({ id: d.id, ...d.data() }));
+}
 
 /**
  * Yangi manzil qo'shadi.
  * @param {string} uid
  * @param {object} address - {label, address, lat, lng, apartment, entrance,
- *                            floor, intercom, comment}
+ *                            floor, intercom, comment, zone}
  * @returns {Promise<string>} yaratilgan hujjat id'si
  */
-export async function addAddress(uid, address) {}
+export async function addAddress(uid, address) {
+  const { dbx, sdk } = await getFirebase();
+  const ref = await sdk.addDoc(sdk.collection(dbx, 'users', uid, 'addresses'), {
+    ...address,
+    createdAt: sdk.serverTimestamp()
+  });
+  return ref.id;
+}
 
 /**
  * Manzilni tahrirlaydi.
@@ -209,7 +222,10 @@ export async function addAddress(uid, address) {}
  * @param {object} patch
  * @returns {Promise<void>}
  */
-export async function updateAddress(uid, addressId, patch) {}
+export async function updateAddress(uid, addressId, patch) {
+  const { dbx, sdk } = await getFirebase();
+  await sdk.updateDoc(sdk.doc(dbx, 'users', uid, 'addresses', addressId), patch);
+}
 
 /**
  * Manzilni o'chiradi.
@@ -217,7 +233,10 @@ export async function updateAddress(uid, addressId, patch) {}
  * @param {string} addressId
  * @returns {Promise<void>}
  */
-export async function deleteAddress(uid, addressId) {}
+export async function deleteAddress(uid, addressId) {
+  const { dbx, sdk } = await getFirebase();
+  await sdk.deleteDoc(sdk.doc(dbx, 'users', uid, 'addresses', addressId));
+}
 
 /* --------------------------------------------------------------- buyurtma */
 
