@@ -29,7 +29,18 @@ admin/                admin panel — ALOHIDA PWA (o'z manifest va SW bilan)
     auth.js           Firebase Auth + staff kolleksiyasida rol
     db.js             admin uchun BARCHA Firestore chaqiruvlari
     api.js            Node servis (status, kuryer)
-    pages/            login, dashboard, orders, kds, menu, branches, promos, reports
+    pages/            login, dashboard, orders, kds, menu, branches,
+                      couriers, promos, reports
+courier/              kuryer ilovasi — ALOHIDA PWA (o'z manifest va SW bilan)
+  index.html
+  css/courier.css
+  js/
+    config.js         kuryerga xos sozlamalar; Firebase ../../js dan
+    auth.js           OTP + `POST /api/courier/claim`
+    db.js             kuryer uchun BARCHA Firestore chaqiruvlari
+    api.js            Node servis (status, hisob)
+    geo.js            joylashuv — uchala shart bajarilgandagina yoziladi
+    pages/            login, orders, report
 server/               Node servis (Express + Firebase Admin SDK)
 firestore.rules       xavfsizlik qoidalari (konsolga qo'lda nusxalanadi)
 rules-test/           qoidalar testi (Firestore emulyatorida)
@@ -44,6 +55,14 @@ Statik fayllar — hech qanday build yo'q. Istalgan statik server yetarli:
 ```bash
 npx http-server . -p 8080 -c-1
 ```
+
+Uchala ilova bir xil manbadan chiqadi:
+
+| Ilova | Manzil |
+| --- | --- |
+| Mijoz | `/` |
+| Admin panel | `/admin/` |
+| Kuryer | `/courier/` |
 
 GitHub Pages'ga chiqarish: `main` shoxini Pages manbasi qilib belgilash
 kifoya. Firebase konsolida **Authentication → Settings → Authorized
@@ -110,6 +129,9 @@ va nima yetishmayotganini `problems` ro'yxatida ko'rsatadi.
 | `POST` | `/api/orders` | Firebase ID token |
 | `PATCH` | `/api/orders/:id/status` | staff: superadmin, manager, operator, kitchen |
 | `PATCH` | `/api/orders/:id/courier` | staff: superadmin, manager, operator |
+| `POST` | `/api/courier/claim` | Firebase ID token (kuryer) |
+| `PATCH` | `/api/orders/:id/courier-status` | kuryer — faqat o'ziniki, `on_way`/`delivered` |
+| `GET` | `/api/courier/report` (`?date=YYYY-MM-DD`) | kuryer |
 | `POST` | `/api/jobs/:name` (`guarantee`, `bonus`, `report`) | `ADMIN_UIDS` |
 
 Xato javobi doim bir xil ko'rinishda:
@@ -300,6 +322,7 @@ havola keladi, uni bosish kifoya. Oldindan qo'shsangiz:
 | --- | --- |
 | `orders` | `guaranteeBroken` (asc) + `guaranteeDeadline` (asc) |
 | `orders` | `uid` (asc) + `promoCode` (asc) |
+| `orders` | `courierId` (asc) + `createdAt` (asc) — kuryerning kunlik hisobi |
 | `bonusHistory` (collection group) | `type` (asc) + `expiresAt` (asc) |
 
 ### 6. Deploydan keyin tekshirish
@@ -371,6 +394,10 @@ birinchi xodim aynan shu yerdan beriladi.
   Polygon nuqtalari `lat, lng` qatorlari ko'rinishida kiritiladi va
   `[{lat, lng}]` obyektlari bo'lib saqlanadi (Firestore ichma-ich
   massivni qabul qilmaydi).
+- **Kuryerlar** — CRUD. Hujjat ID qoidasi pastda ("Kuryer ilovasi")
+  batafsil yozilgan: yangi kuryer `pending_<telefon>` ID bilan
+  yaratiladi, u birinchi marta kirgandan keyin hujjat `uid` ga
+  ko'chadi. Kirgan kuryerda telefon o'zgartirilmaydi.
 - **Promokodlar** — CRUD. Hujjat ID = kodning o'zi, shuning uchun kod
   yaratilgandan keyin o'zgartirilmaydi.
 - **Hisobotlar** — `reports/{YYYY-MM-DD}` (cron yozadi) va bugungi kun
@@ -389,6 +416,70 @@ kodni oladi, kesh faqat internet uzilganda zaxira bo'ladi. Mijoz
 ilovasidagi SW esa "keshdan ber, fonda yangila" — u admin yo'lini
 chetlab o'tadi (scope'i kengroq bo'lsa ham).
 
+---
+
+## Kuryer ilovasi
+
+Manzil: **`/pizza-pwa/courier/`** — uchinchi mustaqil PWA, o'z manifest
+va service worker'i bilan. Admin paneldek **tarmoq birinchi**: kuryer
+eski kod bilan qolib ketmasligi kerak. Ildizdagi `sw.js` `/courier/`
+yo'lini ham chetlab o'tadi.
+
+### Kuryerni qo'shish tartibi
+
+1. Admin panel → **Kuryerlar** → "Kuryer qo'shish": ism, telefon,
+   (ixtiyoriy) filial. Hujjat `couriers/pending_<telefon raqamlari>`
+   ID bilan yaratiladi.
+2. Kuryer `/pizza-pwa/courier/` ni ochadi va **aynan shu raqam** bilan
+   OTP orqali kiradi.
+3. Kirish paytida ilova `POST /api/courier/claim` chaqiradi. Servis
+   `pending_` hujjatini topib `couriers/{uid}` ga ko'chiradi va
+   eskisini o'chiradi.
+4. Shundan keyin kuryer ro'yxatda "kirishi kutilmoqda" belgisisiz
+   ko'rinadi va unga buyurtma tayinlash mumkin bo'ladi.
+
+**Nega shunday.** `firestore.rules` dagi `isOwner(courierId)` hujjat ID
+si Firebase `uid` ga teng bo'lishini talab qiladi (kuryer o'z
+joylashuvini yozishi uchun), lekin admin kuryerni qo'shayotganda uning
+`uid` si hali yo'q. `pending_` — shu bo'shliqni to'ldiradigan
+vaqtinchalik holat.
+
+Kutilayotgan kuryerga buyurtma tayinlab bo'lmaydi: servis 409
+`courier-pending` qaytaradi, admin paneldagi tayinlash ro'yxatida ham
+u ko'rinmaydi.
+
+### Nima qila oladi
+
+- Smena ochish / yopish (faol buyurtma bilan yopilmaydi).
+- Faqat **o'ziga tayinlangan** buyurtmalarni ko'rish — `firestore.rules`
+  boshqasini bermaydi.
+- "Oldim" → `on_way`, "Yetkazdim" → `delivered`. Boshqa statusni
+  qo'ya olmaydi (servis tekshiradi).
+- Naqd buyurtmada "pul olindimi" so'raladi; javob buyurtmada
+  `cashCollected` bo'lib saqlanadi.
+- Yandex Navigator: `yandexnavi://` deep link, ilova o'rnatilmagan
+  bo'lsa 1200 ms dan keyin brauzerdagi xarita ochiladi.
+- Kunlik hisob: yetkazilgan soni, yetkazish narxi, naqd va karta
+  yig'indilari (`GET /api/courier/report`).
+
+### Geolokatsiya va Firestore kvotasi
+
+Joylashuv **uchala shart birga bajarilgandagina** yoziladi:
+
+1. smena ochiq;
+2. oxirgi YOZILGAN nuqtadan 50 metrdan ortiq siljigan;
+3. ilova old planda (`visibilitychange` bilan to'xtaydi);
+
+va qo'shimcha: kuryerda `on_way` statusidagi buyurtma bor.
+
+Taymer har 15 sekundda tekshiradi, lekin yozuv shartlarsiz bo'lmaydi.
+Shartsiz yozilganda bitta kuryer 8 soatlik smenada ~2000 yozuv berardi,
+bepul Firestore kvotasi esa 20 000 yozuv/kun — 8–10 kuryerda kvota
+tugab qolardi. Sozlamalar `courier/js/config.js` dagi `COURIER.geo` da.
+
+Geolokatsiyaga ruxsat berilmasa ilova buzilmaydi — smena ochilaveradi,
+faqat yuqorida ogohlantirish chiqadi.
+
 ## Firestore qoidalari (xavfsizlik)
 
 Qoidalar `firestore.rules` faylida. **Node servis Admin SDK orqali
@@ -403,8 +494,8 @@ brauzerdagi ikki ilovaga tegishli.
 | `users/{uid}` | o'zi; `superadmin`/`manager`/`operator` | o'zi — faqat `name`, `phone`, `lang`, `birthday`, `lastLoginAt` |
 | `users/{uid}/addresses` | o'zi | o'zi |
 | `users/{uid}/bonusHistory` | o'zi; `superadmin`/`manager` | hech kim (servis yozadi) |
-| `orders` | o'zinikini; buyurtma xodimlari hammasini | **hech kim** — istisno: o'z yetkazilgan buyurtmasiga `rating` |
-| `couriers` | kirgan foydalanuvchi (treking uchun) | kuryer — o'z `location`/`onShift` |
+| `orders` | o'zinikini; **kuryer — `courierId == uid` bo'lganini**; buyurtma xodimlari hammasini | **hech kim** — istisno: o'z yetkazilgan buyurtmasiga `rating` |
+| `couriers` | kirgan foydalanuvchi (treking uchun) | kuryer — o'z `location`, `onShift`, `activeOrders`, `shiftStartedAt`, `shiftEndedAt` |
 | `promocodes` | `superadmin`, `manager` | `superadmin`, `manager` |
 | `staff` | o'z hujjatini; `superadmin` hammasini | `superadmin` |
 | `reports` | `superadmin`, `manager` | hech kim (cron yozadi) |

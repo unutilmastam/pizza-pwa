@@ -15,9 +15,10 @@ export { FIREBASE_CONFIG, API_BASE, getFirebase } from '../../js/config.js';
  * menyuda ham, sahifa ochilganda ham shu ro'yxat tekshiriladi.
  */
 export const ROLE_SECTIONS = {
-  superadmin: ['dashboard', 'orders', 'kds', 'menu', 'branches', 'promos', 'reports'],
-  manager: ['dashboard', 'orders', 'kds', 'menu', 'branches', 'promos', 'reports'],
-  operator: ['dashboard', 'orders', 'kds'],
+  superadmin: ['dashboard', 'orders', 'kds', 'menu', 'branches', 'couriers', 'promos', 'reports'],
+  manager: ['dashboard', 'orders', 'kds', 'menu', 'branches', 'couriers', 'promos', 'reports'],
+  // Operator kuryerlarni ko'radi, chunki buyurtmani u tayinlaydi
+  operator: ['dashboard', 'orders', 'kds', 'couriers'],
   kitchen: ['kds'],
   // Kuryerning o'z ilovasi bo'ladi — admin panelda unga bo'lim yo'q
   courier: []
@@ -30,6 +31,7 @@ export const SECTIONS = [
   { id: 'kds', path: '/kds', icon: '👨‍🍳', key: 'nav.kds' },
   { id: 'menu', path: '/menu', icon: '🍕', key: 'nav.menu' },
   { id: 'branches', path: '/branches', icon: '📍', key: 'nav.branches' },
+  { id: 'couriers', path: '/couriers', icon: '🛵', key: 'nav.couriers' },
   { id: 'promos', path: '/promos', icon: '🎟', key: 'nav.promos' },
   { id: 'reports', path: '/reports', icon: '📈', key: 'nav.reports' }
 ];

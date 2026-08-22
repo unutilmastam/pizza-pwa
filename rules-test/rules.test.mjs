@@ -61,6 +61,10 @@ async function seed() {
     });
 
     await setDoc(doc(db, 'couriers', 'c1'), { name: 'Sardor', onShift: true, location: { lat: 41.3, lng: 69.2 } });
+    await setDoc(doc(db, 'couriers', 'pending_998905550011'), { name: 'Yangi', phone: '+998905550011', active: true });
+    await setDoc(doc(db, 'orders', 'o4'), {
+      uid: 'u2', orderNumber: 4, status: 'on_way', total: 60000, courierId: 'c1', createdAt: NOW
+    });
     await setDoc(doc(db, 'promocodes', 'YANGI10'), { type: 'percent', value: 10, active: true });
     await setDoc(doc(db, 'reports', '2026-08-19'), { orders: 10, revenue: 900000 });
     await setDoc(doc(db, 'counters', 'orderNumber'), { value: 42 });
@@ -357,5 +361,59 @@ test('sozlamalarni faqat superadmin yozadi', async () => {
   }));
   await assertFails(setDoc(doc(asUser('manager1'), 'settings', 'global'), {
     guaranteeMinutes: 5
+  }));
+});
+
+
+/* ==================================================== KURYER (9-bosqich) */
+
+test('kuryer O\'ZIGA tayinlangan buyurtmani o\'qiydi', async () => {
+  const db = asUser('c1');
+  await assertSucceeds(getDoc(doc(db, 'orders', 'o4')));
+  await assertSucceeds(getDocs(query(collection(db, 'orders'), where('courierId', '==', 'c1'))));
+});
+
+test('kuryer BEGONA buyurtmani o\'qiy olmaydi', async () => {
+  const db = asUser('c1');
+  await assertFails(getDoc(doc(db, 'orders', 'o3')));
+  await assertFails(getDocs(collection(db, 'orders')));
+  await assertFails(getDocs(query(collection(db, 'orders'), where('courierId', '==', 'c2'))));
+});
+
+test('boshqa foydalanuvchi kuryer buyurtmasini o\'qiy olmaydi', async () => {
+  await assertFails(getDoc(doc(asUser('u1'), 'orders', 'o4')));
+});
+
+test('kuryer buyurtma statusini BEVOSITA o\'zgartira olmaydi (servis orqali)', async () => {
+  await assertFails(updateDoc(doc(asUser('c1'), 'orders', 'o4'), { status: 'delivered' }));
+  await assertFails(updateDoc(doc(asUser('c1'), 'orders', 'o4'), { cashCollected: true }));
+});
+
+test('kuryer smena va joylashuvini yoza oladi', async () => {
+  const db = asUser('c1');
+  await assertSucceeds(updateDoc(doc(db, 'couriers', 'c1'), {
+    onShift: true, shiftStartedAt: new Date()
+  }));
+  await assertSucceeds(updateDoc(doc(db, 'couriers', 'c1'), {
+    location: { lat: 41.32, lng: 69.26, at: new Date() }
+  }));
+});
+
+test('kuryer o\'z hujjatida boshqa maydonga tegolmaydi', async () => {
+  await assertFails(updateDoc(doc(asUser('c1'), 'couriers', 'c1'), { name: 'Boshqa' }));
+  await assertFails(updateDoc(doc(asUser('c1'), 'couriers', 'c1'), { branchId: 'b9' }));
+});
+
+test('kuryer BOSHQA kuryerning hujjatini yoza olmaydi', async () => {
+  await assertFails(updateDoc(doc(asUser('u1'), 'couriers', 'c1'), { onShift: false }));
+});
+
+test('pending hujjatni faqat admin yaratadi va o\'chiradi', async () => {
+  await assertSucceeds(setDoc(doc(asUser('manager1'), 'couriers', 'pending_998901110022'), {
+    name: 'Yangi kuryer', phone: '+998901110022', active: true
+  }));
+  await assertSucceeds(deleteDoc(doc(asUser('super1'), 'couriers', 'pending_998901110022')));
+  await assertFails(setDoc(doc(asUser('u1'), 'couriers', 'pending_998909990088'), {
+    name: 'Soxta', phone: '+998909990088'
   }));
 });

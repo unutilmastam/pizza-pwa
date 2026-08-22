@@ -1,0 +1,29 @@
+{
+  "id": "/courier/",
+  "name": "Pitsa — kuryer",
+  "short_name": "Kuryer",
+  "description": "Tayinlangan buyurtmalar, smena va kunlik hisob.",
+  "lang": "uz",
+  "dir": "ltr",
+  "start_url": "./index.html?source=pwa",
+  "scope": "./",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#14171c",
+  "theme_color": "#14171c",
+  "categories": ["business", "navigation"],
+  "icons": [
+    {
+      "src": "../icons/icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any"
+    },
+    {
+      "src": "../icons/icon-maskable.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "maskable"
+    }
+  ]
+}

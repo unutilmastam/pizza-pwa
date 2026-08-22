@@ -1,0 +1,65 @@
+<!DOCTYPE html>
+<html lang="uz">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="robots" content="noindex">
+  <meta name="theme-color" content="#14171c">
+  <title>Pitsa — kuryer</title>
+  <link rel="manifest" href="./manifest.json">
+  <link rel="icon" href="../icons/icon.svg" type="image/svg+xml">
+  <link rel="stylesheet" href="./css/courier.css">
+</head>
+<body>
+  <div class="app" id="app" hidden>
+    <header class="topbar">
+      <div class="topbar__main">
+        <span class="topbar__name" id="courierName"></span>
+        <span class="topbar__geo" id="geoStatus"></span>
+      </div>
+      <button class="btn btn--sm btn--ghost" id="langBtn" type="button">UZ</button>
+      <button class="btn btn--sm btn--ghost" id="logoutBtn" type="button">Chiqish</button>
+    </header>
+
+    <div class="shift" id="shiftBar">
+      <span class="shift__state" id="shiftState"></span>
+      <button class="btn btn--sm" id="shiftBtn" type="button"></button>
+    </div>
+
+    <main class="content" id="content" tabindex="-1"></main>
+
+    <nav class="tabs" aria-label="Bo'limlar">
+      <button class="tabs__btn is-active" data-tab="orders" type="button">
+        <span aria-hidden="true">📦</span>
+        <span data-i18n="nav.orders">Buyurtmalar</span>
+        <span class="tabs__count" id="ordersCount" hidden>0</span>
+      </button>
+      <button class="tabs__btn" data-tab="report" type="button">
+        <span aria-hidden="true">💰</span>
+        <span data-i18n="nav.report">Hisob</span>
+      </button>
+    </nav>
+  </div>
+
+  <div class="boot" id="boot">
+    <div class="boot__spinner" aria-hidden="true"></div>
+    <p class="boot__text">Yuklanmoqda…</p>
+  </div>
+
+  <div class="toasts" id="toasts" role="status" aria-live="polite"></div>
+
+  <script type="module" src="./js/app.js"></script>
+  <script>
+    // Kuryer ilovasining O'Z SW'i — tarmoq birinchi. Ildizdagi SW ning
+    // scope'i kengroq, lekin brauzer eng aniq mos keluvchisini tanlaydi
+    // va ildizdagisi `/courier/` ni chetlab o'tadi.
+    if ('serviceWorker' in navigator) {
+      window.addEventListener('load', () => {
+        navigator.serviceWorker.register('./sw.js', { scope: './' }).catch((e) => {
+          console.warn('Kuryer SW ro\'yxatdan o\'tmadi:', e);
+        });
+      });
+    }
+  </script>
+</body>
+</html>

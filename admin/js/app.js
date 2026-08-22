@@ -200,6 +200,7 @@ function startRouter() {
   registerSection('/kds', 'kds', () => import('./pages/kds.js'));
   registerSection('/menu', 'menu', () => import('./pages/menu.js'));
   registerSection('/branches', 'branches', () => import('./pages/branches.js'));
+  registerSection('/couriers', 'couriers', () => import('./pages/couriers.js'));
   registerSection('/promos', 'promos', () => import('./pages/promos.js'));
   registerSection('/reports', 'reports', () => import('./pages/reports.js'));
 

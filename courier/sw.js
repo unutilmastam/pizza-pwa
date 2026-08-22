@@ -1,5 +1,5 @@
 /**
- * Admin panel service worker.
+ * Kuryer ilovasi service worker'i.
  *
  * Mijoz ilovasidagi SW dan JIDDIY farq qiladi: u "keshdan ber, fonda
  * yangila" (stale-while-revalidate) tamoyilida ishlaydi, bu esa admin
@@ -7,14 +7,14 @@
  * qolishi mumkin. Shuning uchun bu yerda TARMOQ BIRINCHI: kesh faqat
  * internet uzilganda zaxira sifatida ishlatiladi.
  *
- * Scope: `/pizza-pwa/admin/`. Ildizdagi SW ning scope'i kengroq
+ * Scope: `/pizza-pwa/courier/`. Ildizdagi SW ning scope'i kengroq
  * (`/pizza-pwa/`), lekin brauzer eng aniq mos keladigan ro'yxatdan
- * o'tishni tanlaydi, shuning uchun admin sahifalarini aynan shu SW
- * boshqaradi. Ildizdagi SW ham `/admin/` yo'lini chetlab o'tadi.
+ * o'tishni tanlaydi, shuning uchun kuryer sahifalarini aynan shu SW
+ * boshqaradi. Ildizdagi SW ham `/courier/` yo'lini chetlab o'tadi.
  */
 
-const VERSION = 'v2';
-const SHELL_CACHE = `pizza-admin-${VERSION}`;
+const VERSION = 'v1';
+const SHELL_CACHE = `pizza-courier-${VERSION}`;
 
 /**
  * Hech qachon keshlanmaydigan fayllar.
@@ -28,23 +28,18 @@ const SHELL_ASSETS = [
   './',
   './index.html',
   './manifest.json',
-  './css/admin.css',
+  './css/courier.css',
   './js/app.js',
+  './js/config.js',
   './js/i18n.js',
   './js/ui.js',
   './js/db.js',
   './js/api.js',
   './js/auth.js',
+  './js/geo.js',
   './js/pages/login.js',
-  './js/pages/dashboard.js',
   './js/pages/orders.js',
-  './js/pages/kds.js',
-  './js/pages/menu.js',
-  './js/pages/branches.js',
-  './js/pages/couriers.js',
-  './js/pages/promos.js',
-  './js/pages/reports.js',
-  '../js/router.js'
+  './js/pages/report.js'
 ];
 
 self.addEventListener('install', (event) => {
@@ -62,7 +57,7 @@ self.addEventListener('activate', (event) => {
       const keys = await caches.keys();
       await Promise.all(
         keys
-          .filter((key) => key.startsWith('pizza-admin-') && key !== SHELL_CACHE)
+          .filter((key) => key.startsWith('pizza-courier-') && key !== SHELL_CACHE)
           .map((key) => caches.delete(key))
       );
       await self.clients.claim();
