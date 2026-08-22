@@ -3,7 +3,11 @@
 > Har seans boshida shu faylni o'qi. Faqat "Joriy bosqich" deb belgilangan
 > ishni bajar. Boshqa bosqichlarga o'tma. Tugagach shu faylni yangila.
 
-**Joriy bosqich: 8**
+**Joriy bosqich: hammasi bajarildi**
+
+> SPEC.md dagi 0–8 bosqichlar yakunlandi. Ishga tushirish tartibi
+> README.md da: Render'ga servis, GitHub Pages'ga ilova, so'ng
+> birinchi superadmin va FAQAT SHUNDAN KEYIN Firestore qoidalari.
 
 > Qoldirilgan ishlar:
 > 1. Payme/Click to'lov integratsiyasi (SPEC 4.2) — foydalanuvchi qarori
@@ -573,8 +577,68 @@ Izoh:
 ---
 
 ## Bosqich 8 — Security Rules
-Status: boshlanmagan
+Status: **bajarildi**
 
 `firestore.rules` — SPEC.md 3-bo'lim bo'yicha
 
 Izoh:
+- `firestore.rules` yozildi. Node servis Admin SDK orqali ishlaydi va
+  qoidalarni BUTUNLAY chetlab o'tadi — cheklovlar faqat brauzerdagi
+  ikki ilovaga tegishli.
+- **Ochiq o'qish:** `menu`, `branches`, `banners`, `settings` — mehmon
+  ham ko'radi (kirmasdan menyuni ko'rish SPEC talabi). Yozish:
+  `superadmin`/`manager`, `settings` esa faqat `superadmin`.
+- **Foydalanuvchi:** o'z hujjatini o'qiydi va faqat `name`, `phone`,
+  `lang`, `birthday`, `lastLoginAt` maydonlarini yozadi. `bonusBalance`,
+  `tier`, `totalSpent`, `blocked`, `referralCode`, `referredBy`,
+  `telegramId` — YARATISHDA HAM, yangilashda ham rad etiladi.
+  Manzillar to'liq o'ziniki, bonus tarixi faqat o'qiladi.
+- **Buyurtma:** mijoz faqat o'zinikini o'qiydi (client `where('uid','==')`
+  bilan so'raydi, shu sababli ro'yxat so'rovi ham o'tadi). Yaratish —
+  hech kimga. Yangilash — YAGONA istisno: o'z buyurtmasiga `rating`,
+  va u ham faqat `status == 'delivered'` bo'lganda va boshqa maydonga
+  tegmasa. Admin panel ham buyurtmani bevosita o'zgartira olmaydi —
+  status va kuryer Node servis orqali yoziladi.
+- **Yopiq joylar:** `promocodes` ni client o'qiy olmaydi (aks holda
+  barchasini ko'chirib olish mumkin edi); `otps` (OTP kod xeshlari),
+  `counters`, `idempotency` butunlay yopiq; ro'yxatda yo'q har qanday
+  yo'l — rad etiladi.
+- **Kuryer:** kirgan foydalanuvchi kuryer hujjatini o'qiy oladi (treking
+  sahifasi jonli koordinatani shundan oladi), kuryer esa faqat o'z
+  `location`/`onShift`/`activeOrders` maydonlarini yozadi.
+- **Birinchi superadmin muammosi:** qoidalar yoqilgach `staff` ga faqat
+  superadmin yoza oladi, lekin birinchi superadmin hali yo'q bo'lsa
+  hech kim yoza olmaydi. Yechim — `isBootstrapAdmin()` funksiyasi:
+  ro'yxatga o'z uid'ingizni yozib qoidalarni chop etasiz, rolni
+  berasiz, so'ng ro'yxatni bo'shatasiz. Bu teshik FAQAT `staff` ga
+  ochiladi — test bilan tasdiqlangan.
+- `tools/` vositalari qoidalardan keyin ishlamay qoladi (ular oddiy
+  foydalanuvchi nomidan `menu`/`branches` ga yozadi) — bu kutilgan
+  holat, endi ular admin panelidan boshqariladi.
+- Tekshirildi — HAQIQIY Firestore emulyatorida (`rules-test/`,
+  `@firebase/rules-unit-testing`), 48 ta test o'tdi:
+  - mijoz: mehmon menyu/filial/banner/sozlamalarni o'qidi va ularni
+    o'zgartira olmadi; o'z profilini o'qidi va tahrirladi, boshqanikini
+    o'qiy olmadi; bonus/tier/totalSpent/blocked ni yoza olmadi (yangi
+    hujjat yaratishda ham); manzillar CRUD ishladi; bonus tarixiga yoza
+    olmadi; `where('uid','==',me)` so'rovi o'tdi, filtrsiz va begona
+    uid bilan so'rov rad etildi; buyurtma yarata olmadi va o'chira
+    olmadi; yetkazilgan buyurtmaga baho qo'ya oldi, lekin baho bahonasida
+    narx/statusni o'zgartira olmadi va yetkazilmaganiga baho qo'yolmadi;
+    kuryer joylashuvini kuzata oldi; promokod, otps, counters,
+    idempotency, reports va noma'lum kolleksiyalar yopiq chiqdi;
+    o'zini staff qilib qo'yolmadi;
+  - admin: har bir xodim o'z rolini o'qidi (kirish shunga bog'liq),
+    superadmin boshqalarnikini ham; staff ni faqat superadmin yozdi;
+    buyurtmalar oqimi (uid filtrisiz, `orderBy` bilan) to'rt rol uchun
+    ham ochildi; menyu/filial/promokodni superadmin va manager
+    boshqardi, operator va oshxona qila olmadi; hisobotni faqat
+    superadmin/manager o'qidi va hech kim yoza olmadi; O'CHIRILGAN
+    xodim (`active: false`) hech narsa qila olmadi;
+  - bootstrap: ro'yxatdagi uid birinchi superadminni yaratdi,
+    ro'yxatda yo'q uid yarata olmadi, ro'yxatdagi uid esa `staff` dan
+    tashqari joyga (settings, menu, orders) tegolmadi.
+- README.md ga qo'shildi: kim nima qila olishi jadvali, Firebase
+  konsolidan qo'lda joylashtirish tartibi, "avval superadmin, keyin
+  qoidalar" ogohlantirishi, bootstrap yo'li va `rules-test` ni
+  yugurtirish.

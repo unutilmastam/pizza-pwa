@@ -1,0 +1,255 @@
+rules_version = '2';
+
+/*
+ * Pitsa PWA — Firestore xavfsizlik qoidalari (SPEC 3-bo'lim).
+ *
+ * MUHIM: Node servis Firebase Admin SDK orqali ishlaydi va qoidalarni
+ * BUTUNLAY CHETLAB O'TADI. Ya'ni bu yerdagi hamma cheklov faqat
+ * brauzerdagi ikki ilovaga tegishli:
+ *   - mijoz ilovasi (`/`)
+ *   - admin panel (`/admin/`)
+ * Servis buyurtma yaratishda, statusni o'zgartirishda, bonus va
+ * promokod hisoblagichlarida hech qanday to'siqqa uchramaydi.
+ *
+ * Asosiy tamoyillar:
+ *   1. Menyu, filial, banner va sozlamalar — hammaga OCHIQ (mehmon ham
+ *      ko'radi), yozish faqat xodimga.
+ *   2. Buyurtmani client YARATA OLMAYDI va o'zgartira olmaydi. Yagona
+ *      istisno — o'z buyurtmasiga baho qo'yish (`rating`).
+ *   3. Foydalanuvchi o'z hujjatini tahrirlaydi, LEKIN pul bilan bog'liq
+ *      maydonlarga (`bonusBalance`, `tier`, `totalSpent`, `blocked`)
+ *      tegolmaydi — ularni faqat servis yozadi.
+ *   4. Promokodlarni client O'QIY OLMAYDI (aks holda hammasini ko'chirib
+ *      olish mumkin edi) — ularni servis tekshiradi, xodim boshqaradi.
+ *   5. Servisga tegishli texnik kolleksiyalar (`otps`, `counters`,
+ *      `idempotency`) client uchun butunlay yopiq. `otps` da OTP
+ *      kodlarining xeshi yotadi.
+ *   6. Ro'yxatda yo'q har qanday yo'l — YOPIQ (eng oxirgi qoida).
+ *
+ * Joylashtirish: README.md dagi "Firestore qoidalari" bo'limiga qarang.
+ */
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    /* ------------------------------------------------- yordamchilar */
+
+    /** Foydalanuvchi tizimga kirganmi. */
+    function signedIn() {
+      return request.auth != null;
+    }
+
+    /** Shu uid ning egasimi. */
+    function isOwner(uid) {
+      return signedIn() && request.auth.uid == uid;
+    }
+
+    /**
+     * BIRINCHI SUPERADMIN uchun zaxira yo'l.
+     *
+     * Qoidalar yoqilgach `staff` ga faqat superadmin yoza oladi — lekin
+     * birinchi superadmin hali yo'q bo'lsa hech kim yoza olmaydi va
+     * admin panel ochilmay qoladi. Shu tugunni yechish uchun quyidagi
+     * ro'yxatga O'Z uid'ingizni yozing (Firebase konsoli →
+     * Authentication → Users, yoki `tools/seed-staff.html` ko'rsatadi).
+     *
+     * Birinchi superadmin yaratilgach ro'yxatni BO'SHATIB qo'ying:
+     *   return false;
+     */
+    function isBootstrapAdmin() {
+      return signedIn() && request.auth.uid in [
+        // 'BU_YERGA_UID_YOZING'
+      ];
+    }
+
+    /** `staff/{uid}` hujjati (bir so'rov ichida keshlanadi). */
+    function staffDoc() {
+      return get(/databases/$(database)/documents/staff/$(request.auth.uid)).data;
+    }
+
+    /** Xodimmi va hisobi faolmi. */
+    function isStaff() {
+      return signedIn()
+        && exists(/databases/$(database)/documents/staff/$(request.auth.uid))
+        && staffDoc().active != false;
+    }
+
+    /**
+     * Xodimning roli ro'yxatdagilardan birimi.
+     * @param roles rollar ro'yxati
+     */
+    function hasRole(roles) {
+      return isStaff() && staffDoc().role in roles;
+    }
+
+    /** Katalogni tahrirlay oladiganlar (menyu, filial, banner, promokod). */
+    function isCatalogEditor() {
+      return hasRole(['superadmin', 'manager']);
+    }
+
+    /** Buyurtmalarni ko'ra oladiganlar. */
+    function isOrderStaff() {
+      return hasRole(['superadmin', 'manager', 'operator', 'kitchen']);
+    }
+
+    /**
+     * So'rov faqat shu maydonlarga tegyaptimi.
+     * @param allowed ruxsat etilgan maydonlar
+     */
+    function onlyChanges(allowed) {
+      return request.resource.data.diff(resource.data).affectedKeys().hasOnly(allowed);
+    }
+
+    /**
+     * So'rovda taqiqlangan maydonlar YO'Qmi.
+     * @param blocked taqiqlangan maydonlar
+     */
+    function noFields(blocked) {
+      return !request.resource.data.keys().hasAny(blocked);
+    }
+
+    /** Foydalanuvchi o'zi yoza olmaydigan maydonlar — ularni servis yozadi. */
+    function protectedUserFields() {
+      return ['bonusBalance', 'tier', 'totalSpent', 'blocked',
+              'referralCode', 'referredBy', 'telegramId'];
+    }
+
+    /* -------------------------------------------------------- katalog */
+
+    // Menyu — bitta hujjat (`menu/current`). Mehmon ham ko'radi.
+    match /menu/{docId} {
+      allow read: if true;
+      allow write: if isCatalogEditor();
+    }
+
+    // Filiallar: manzil, ish vaqti, zonalar, stop-list.
+    match /branches/{branchId} {
+      allow read: if true;
+      allow write: if isCatalogEditor();
+    }
+
+    // Bannerlar (SPEC 116 — admin CRUD keyingi bosqichda).
+    match /banners/{bannerId} {
+      allow read: if true;
+      allow write: if isCatalogEditor();
+    }
+
+    // Sozlamalar: kafolat daqiqalari, cashback foizi, qo'llab-quvvatlash.
+    match /settings/{docId} {
+      allow read: if true;
+      allow write: if hasRole(['superadmin']);
+    }
+
+    /* -------------------------------------------------- foydalanuvchi */
+
+    match /users/{uid} {
+      // O'zi o'qiydi; xodim mijozlar bazasi uchun o'qiy oladi (SPEC 117)
+      allow read: if isOwner(uid) || hasRole(['superadmin', 'manager', 'operator']);
+
+      // Yaratishda ham, yangilashda ham pul maydonlariga tegib bo'lmaydi
+      allow create: if isOwner(uid) && noFields(protectedUserFields());
+      allow update: if isOwner(uid)
+                       && onlyChanges(['name', 'phone', 'lang', 'birthday',
+                                       'lastLoginAt', 'updatedAt'])
+                    || hasRole(['superadmin', 'manager']);
+
+      // Hujjatni o'chirish yo'q — buyurtmalar tarixi unga bog'liq
+      allow delete: if false;
+    }
+
+    // Manzillar butunlay foydalanuvchiniki
+    match /users/{uid}/addresses/{addressId} {
+      allow read, write: if isOwner(uid);
+    }
+
+    // Bonus tarixini faqat servis yozadi, egasi o'qiydi
+    match /users/{uid}/bonusHistory/{entryId} {
+      allow read: if isOwner(uid) || hasRole(['superadmin', 'manager']);
+      allow write: if false;
+    }
+
+    /* ----------------------------------------------------- buyurtma */
+
+    match /orders/{orderId} {
+      // Mijoz faqat o'zinikini. Client `where('uid','==',auth.uid)` bilan
+      // so'raydi — shu sababli ro'yxat so'rovi ham o'tadi.
+      allow read: if signedIn()
+                     && (resource.data.uid == request.auth.uid || isOrderStaff());
+
+      // Buyurtmani FAQAT Node servis yaratadi (narxni u qayta hisoblaydi)
+      allow create: if false;
+
+      // Yagona istisno: o'z buyurtmangizga baho qo'yish (SPEC 88).
+      // Boshqa hamma o'zgarish — status, kuryer, narx — servis orqali.
+      allow update: if signedIn()
+                       && resource.data.uid == request.auth.uid
+                       && resource.data.status == 'delivered'
+                       && onlyChanges(['rating']);
+
+      allow delete: if false;
+    }
+
+    /* ------------------------------------------------------- kuryer */
+
+    match /couriers/{courierId} {
+      // Mijoz treking sahifasida kuryer koordinatasini kuzatadi, xodim
+      // esa ro'yxatni ko'radi. Hujjatda ism, telefon va joylashuv bor —
+      // ular buyurtma hujjatida ham mijozga ko'rsatiladi.
+      allow read: if signedIn();
+
+      // Kuryer faqat O'Z joylashuvini yozadi
+      allow update: if isOwner(courierId)
+                       && onlyChanges(['location', 'onShift', 'activeOrders']);
+      allow create, delete: if hasRole(['superadmin', 'manager']);
+    }
+
+    /* ----------------------------------------------------- promokod */
+
+    match /promocodes/{code} {
+      // Client O'QIY OLMAYDI: aks holda barcha promokodlarni ko'chirib
+      // olish mumkin bo'lardi. Kodni Node servis tekshiradi.
+      allow read: if isCatalogEditor();
+      allow write: if isCatalogEditor();
+    }
+
+    /* -------------------------------------------------------- xodim */
+
+    match /staff/{uid} {
+      // Xodim o'z rolini o'qiydi (admin panel kirishda shuni tekshiradi)
+      allow read: if isOwner(uid) || hasRole(['superadmin']);
+      allow write: if hasRole(['superadmin']) || isBootstrapAdmin();
+    }
+
+    /* ------------------------------------------------------ hisobot */
+
+    match /reports/{date} {
+      allow read: if hasRole(['superadmin', 'manager']);
+      // Hisobotni cron yozadi (Admin SDK)
+      allow write: if false;
+    }
+
+    /* --------------------------------------------- servis texnikasi */
+
+    // OTP kodlarining xeshi — client uchun butunlay yopiq
+    match /otps/{phone} {
+      allow read, write: if false;
+    }
+
+    // Buyurtma raqami hisoblagichi — transaction bilan servis oshiradi
+    match /counters/{counterId} {
+      allow read, write: if false;
+    }
+
+    // Takroriy buyurtmadan himoya kalitlari
+    match /idempotency/{keyId} {
+      allow read, write: if false;
+    }
+
+    /* --------------------------------------------------- qolgani yopiq */
+
+    // Yuqorida sanalmagan har qanday yo'l — rad etiladi.
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}
