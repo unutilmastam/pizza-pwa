@@ -3,7 +3,7 @@
 > Har seans boshida shu faylni o'qi. Faqat "Joriy bosqich" deb belgilangan
 > ishni bajar. Boshqa bosqichlarga o'tma. Tugagach shu faylni yangila.
 
-**Joriy bosqich: hammasi bajarildi**
+**Joriy bosqich: 9**
 
 > SPEC.md dagi 0–8 bosqichlar yakunlandi. Ishga tushirish tartibi
 > README.md da: Render'ga servis, GitHub Pages'ga ilova, so'ng
@@ -16,7 +16,6 @@
 >    webhook yo'llari birga kengaytiriladi.
 > 2. Admin panelning qolgan bo'limlari (SPEC 116–121): banner CRUD,
 >    mijozlar bazasi va qora ro'yxat, broadcast, sozlamalar, audit log.
-> 3. Kuryer ilovasi (SPEC 122–128).
 
 ---
 
@@ -642,3 +641,89 @@ Izoh:
   konsolidan qo'lda joylashtirish tartibi, "avval superadmin, keyin
   qoidalar" ogohlantirishi, bootstrap yo'li va `rules-test` ni
   yugurtirish.
+
+---
+
+## Bosqich 9 — kuryer ilovasi
+Status: **joriy**
+
+`courier/` — alohida PWA (SPEC 122–128)
+
+- Kirish: telefon + OTP, faqat `couriers` da ro'yxatdan o'tgan raqamlar
+- Smena ochish / yopish
+- Tayinlangan buyurtmalar ro'yxati
+- "Oldim" → "Yo'ldaman" → "Yetkazdim"
+- Yandex Navigator'ga o'tish (deep link)
+- Naqd pul olindi belgisi
+- Geolokatsiya har 15 sek Firestore'ga
+- Kunlik hisob
+
+Admin panelga **"Kuryerlar" bo'limi** (CRUD) qo'shiladi — kuryerlarni
+shu yerdan qo'shiladi, aks holda ilovaga kirish uchun hujjat bo'lmaydi.
+
+### AVVAL HAL QILINADIGAN TO'SIQLAR
+
+Bular taxmin emas — joriy koddan tekshirilgan. Ilova yozilishidan
+oldin ular ochilmasa, kuryer hech narsa ko'ra olmaydi:
+
+1. **Kuryer buyurtmalarni O'QIY OLMAYDI.** `firestore.rules` dagi
+   `isOrderStaff()` = `['superadmin','manager','operator','kitchen']` —
+   `courier` ro'yxatda YO'Q, `orders` read qoidasi esa faqat shu
+   funksiyaga va `resource.data.uid == auth.uid` ga tayanadi.
+   Yechim: kuryerga FAQAT o'ziga tayinlangan buyurtmani ochish
+   (`resource.data.courierId == request.auth.uid`), hammasini emas.
+   Qoida o'zgargach `rules-test/` ga test qo'shilsin.
+
+2. **Kuryer statusni o'zgartira olmaydi.** `server/index.js` dagi
+   `ORDER_ROLES` ham `courier` ni o'z ichiga olmaydi, shuning uchun
+   `PATCH /api/orders/:id/status` 403 qaytaradi.
+   Yechim: kuryer uchun alohida yo'l (`/api/orders/:id/courier-status`)
+   yoki `requireStaff(['courier'])` bilan cheklangan, faqat
+   `on_way`/`delivered` ga ruxsat beruvchi tekshiruv. Kuryer o'ziga
+   tayinlanmagan buyurtmaga tegmasligi serverda tekshirilsin.
+
+3. **`couriers/{id}` hujjat ID si qaysi?** Hozir admin `getCouriers()`
+   hujjat ID sini kuryer identifikatori deb oladi, `firestore.rules`
+   esa `isOwner(courierId)` — ya'ni ID Firebase `uid` bo'lishi kutiladi.
+   Lekin admin kuryerni qo'shayotganda uning `uid` si hali YO'Q
+   (u birinchi marta kirgandan keyin paydo bo'ladi).
+   Ikki yo'ldan biri tanlansin va yozib qo'yilsin:
+   - (a) hujjat ID = `uid`: admin faqat telefon yozadi, kuryer birinchi
+     marta kirganda servis `couriers/{uid}` hujjatini telefon bo'yicha
+     topib ko'chiradi;
+   - (b) hujjat ID = telefon: unda `firestore.rules` dagi
+     `isOwner(courierId)` ishlamaydi — egalikni boshqacha tekshirish
+     kerak bo'ladi.
+   `assignCourier()` buyurtmaga `courierId` ni shu ID dan yozadi,
+   shuning uchun tanlov 1- va 2-bandga ham ta'sir qiladi.
+
+### BOSHQA MUHIM JIHATLAR
+
+- **SW scope.** Ildizdagi `sw.js` scope'i `/pizza-pwa/` — u `/courier/`
+  ni ham qamrab oladi va uning "keshdan ber, fonda yangila"
+  strategiyasi kuryerni eski kod bilan qoldirishi mumkin. `admin/` da
+  bu allaqachon yechilgan: `sw.js` da `url.pathname.includes('/admin/')`
+  chetlab o'tiladi va `admin/sw.js` TARMOQ BIRINCHI ishlaydi.
+  `courier/` uchun AYNAN shu ikki qadam takrorlansin.
+- **Geolokatsiya har 15 sek** — bu kuniga ~2000 yozuv (8 soatlik smena,
+  bitta kuryer). Bepul Firestore kvotasi 20 000 yozuv/kun, shuning
+  uchun 8–10 kuryerda kvota tugaydi. Kamaytirish yo'llari: faqat
+  smena ochiq bo'lganda yozish, koordinata sezilarli o'zgarganda
+  (masalan 50 metrdan ortiq) yozish, ilova fonda bo'lganda to'xtatish.
+  Rejani tanlab, PROGRESS ga yozib qo'yish kerak.
+- **Batareya va ruxsat.** `watchPosition` ni `enableHighAccuracy` bilan
+  ishlatish batareyani tez yeydi. Ruxsat berilmasa yoki bekor qilinsa
+  ilova buzilmasin — smena ochilaveradi, faqat ogohlantirish chiqsin.
+- **Yandex Navigator deep link** — `yandexnavi://build_route_on_map?lat_to=..&lon_to=..`.
+  Ilova o'rnatilmagan bo'lsa hech narsa bo'lmaydi, shuning uchun
+  zaxira sifatida `https://yandex.uz/maps/?rtext=~lat,lon` havolasi
+  ham berilsin.
+- **Naqd pul belgisi** buyurtmada saqlanadi (masalan `cashCollected`)
+  va uni ham servis yozadi — client `orders` ga yoza olmaydi.
+- **Kunlik hisob** kuryerning bugungi yetkazilgan buyurtmalaridan
+  hisoblanadi: soni, yetkazish narxi yig'indisi, olingan naqd pul.
+- Kuryer `staff` da ham bo'lishi mumkin (`role: 'courier'`), lekin
+  `admin/js/config.js` dagi `ROLE_SECTIONS.courier = []` — u admin
+  panelga kira olmaydi va bu shundayligicha qoladi.
+
+Izoh:
