@@ -13,7 +13,7 @@
  * boshqaradi. Ildizdagi SW ham `/admin/` yo'lini chetlab o'tadi.
  */
 
-const VERSION = 'v2';
+const VERSION = 'v3';
 const SHELL_CACHE = `pizza-admin-${VERSION}`;
 
 /**
@@ -44,7 +44,10 @@ const SHELL_ASSETS = [
   './js/pages/couriers.js',
   './js/pages/promos.js',
   './js/pages/reports.js',
-  '../js/router.js'
+  '../js/router.js',
+  '../js/cache.js',
+  '../js/config.js',
+  '../js/i18n.js'
 ];
 
 self.addEventListener('install', (event) => {
@@ -94,25 +97,63 @@ self.addEventListener('fetch', (event) => {
     return;
   }
 
-  // TARMOQ BIRINCHI: xodim doim eng yangi kodni oladi, kesh esa faqat
-  // internet uzilganda ishlaydi
-  event.respondWith(
-    fetch(request)
-      .then((response) => {
-        if (response && response.status === 200 && response.type === 'basic') {
-          const copy = response.clone();
-          caches.open(SHELL_CACHE).then((cache) => cache.put(request, copy));
-        }
-        return response;
-      })
-      .catch(async () => {
-        const cached = await caches.match(request);
-        if (cached) return cached;
-        if (request.mode === 'navigate') {
-          const shell = await caches.match('./index.html', { ignoreSearch: true });
-          if (shell) return shell;
-        }
-        return new Response('', { status: 504, statusText: 'Oflayn' });
-      })
-  );
+  // TARMOQ BIRINCHI, LEKIN CHEGARA BILAN.
+  //
+  // Maqsad o'zgarmadi: xodim eng yangi kodni olishi kerak. Lekin
+  // "tarmoq birinchi" ni chegarasiz qoldirish sekin LTE da har
+  // navigatsiyani tarmoq tezligiga bog'lab qo'yardi — o'lchovda
+  // (1.5 s/so'rov) ilova qayta ochilishi 1.8 sekund turardi va
+  // ulanish uzilganda umuman ochilmasdi.
+  //
+  // Endi: NET_TIMEOUT ichida javob kelsa u ishlatiladi va keshni
+  // yangilaydi (ya'ni yaxshi tarmoqda hech nima o'zgarmadi). Kelmasa
+  // keshdagi nusxa beriladi, tarmoq so'rovi esa fonda davom etadi va
+  // keshni keyingi ochilish uchun yangilaydi.
+  event.respondWith(networkFirst(request));
 });
+
+/** Tarmoqni shuncha kutamiz, keyin keshga o'tamiz (ms). */
+const NET_TIMEOUT = 2500;
+
+/**
+ * Tarmoq birinchi, chegara bilan.
+ * @param {Request} request
+ * @returns {Promise<Response>}
+ */
+async function networkFirst(request) {
+  const network = fetch(request)
+    .then((response) => {
+      if (response && response.status === 200 && response.type === 'basic') {
+        const copy = response.clone();
+        caches.open(SHELL_CACHE).then((cache) => cache.put(request, copy));
+      }
+      return response;
+    });
+
+  // Fon so'rovi rad etilsa "unhandled rejection" bo'lmasin
+  network.catch(() => {});
+
+  const cached = await caches.match(request);
+
+  // Kesh yo'q — tarmoqdan boshqa iloj yo'q
+  if (!cached) {
+    try {
+      return await network;
+    } catch (e) {
+      if (request.mode === 'navigate') {
+        const shell = await caches.match('./index.html', { ignoreSearch: true });
+        if (shell) return shell;
+      }
+      return new Response('', { status: 504, statusText: 'Oflayn' });
+    }
+  }
+
+  // Kesh bor — tarmoqni CHEGARA bilan kutamiz
+  const timeout = new Promise((resolve) => setTimeout(() => resolve(null), NET_TIMEOUT));
+  try {
+    const response = await Promise.race([network, timeout]);
+    return response || cached;
+  } catch (e) {
+    return cached;
+  }
+}

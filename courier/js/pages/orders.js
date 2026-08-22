@@ -13,7 +13,7 @@
 import { t, pick } from '../i18n.js';
 import { el, toast, modal, confirm, skeleton } from '../ui.js';
 import { COURIER } from '../config.js';
-import { watchMyOrders } from '../db.js';
+import { watchMyOrders, peekMyOrders } from '../db.js';
 import { setOrderStatus } from '../api.js';
 import { getCurrentCourier } from '../auth.js';
 import { updateGeoState } from '../geo.js';
@@ -289,6 +289,14 @@ export function render(ctx = {}) {
     host.replaceChildren(...visible.map(orderCard));
   }
 
+  // KESHDAGI RO'YXAT DARHOL. Oqim birinchi javobini kutguncha ekran
+  // bo'sh turmasin — sekin tarmoqda bu 1–3 sekundlik skeleton edi.
+  const cached = peekMyOrders(courier.id);
+  if (cached && cached.length) {
+    orders = cached;
+    draw();
+  }
+
   stopWatch = watchMyOrders(
     courier.id,
     (list) => {
@@ -297,10 +305,21 @@ export function render(ctx = {}) {
     },
     (error) => {
       console.error('[orders] oqim uzildi:', error);
+      // Keshdagi ro'yxat bo'lsa uni qoldiramiz va faqat ogohlantiramiz —
+      // kuryer ma'lumotsiz qolmasin
+      if (orders.length) {
+        toast(t('app.offline'), { type: 'error' });
+        return;
+      }
       host.replaceChildren(el('div.state', {}, [
         el('div', { text: '⚠️', attrs: { 'aria-hidden': 'true', style: 'font-size:36px' } }),
         el('h2', { text: t('app.error'), attrs: { style: 'font-size:17px' } }),
-        el('p.hint', { text: error.message })
+        el('p.hint', { text: error.message }),
+        el('button.btn.btn--ghost', {
+          text: t('app.retry'),
+          attrs: { type: 'button' },
+          on: { click: () => location.reload() }
+        })
       ]));
     }
   );

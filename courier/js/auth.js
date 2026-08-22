@@ -9,6 +9,10 @@
 
 import { getFirebase } from './config.js';
 import { request, claimCourier } from './api.js';
+import { cache } from './db.js';
+
+/** Kuryer hujjati kesh kaliti. */
+const CACHE_KEY = 'me';
 
 /** @type {?object} joriy kuryer hujjati */
 let courier = null;
@@ -108,9 +112,13 @@ export async function verifyOtp(phone, code) {
 async function loadCourier() {
   try {
     courier = await claimCourier();
+    cache.write(CACHE_KEY, courier);
     emit();
     return courier;
   } catch (e) {
+    // Tarmoq yo'qligi sessiyani yopish uchun asos emas — faqat
+    // servis "sen kuryer emassan" desa chiqaramiz
+    if (e.code === 'timeout' || e.code === 'network') throw e;
     await signOut();
     throw e;
   }
@@ -127,6 +135,7 @@ export async function signOut() {
   } catch (e) {
     console.warn('[auth] signOut xatosi:', e);
   }
+  cache.clear();
   courier = null;
   emit();
 }
@@ -156,6 +165,28 @@ export function initAuth() {
           }
           return;
         }
+        // KESHDAGI HUJJAT BILAN DARHOL OCHAMIZ.
+        //
+        // O'lchovda (1.5 s/so'rov) `POST /api/courier/claim` ilovani
+        // 1.5 sekund ushlab turardi — Render bepul planda uyqudan
+        // uyg'onayotgan bo'lsa 50 sekundgacha. Kuryer esa ekranga
+        // qarab turardi. Endi eski hujjat bilan ekran darhol ochiladi,
+        // `claim` fonda ketadi.
+        //
+        // Xavfsizlik: hujjat faqat QAYSI BO'LIM ko'rinishini belgilaydi,
+        // har bir amalni servis va `firestore.rules` qaytadan tekshiradi.
+        const cached = cache.peek(CACHE_KEY);
+        if (cached && !settled) {
+          courier = cached;
+          settled = true;
+          emit();
+          resolve(cached);
+          loadCourier().catch((e) => {
+            console.warn('[auth] fon tekshiruvi:', e.code || e.message);
+          });
+          return;
+        }
+
         try {
           const doc = await loadCourier();
           if (!settled) {

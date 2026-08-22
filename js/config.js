@@ -18,7 +18,14 @@ export const FIREBASE_CONFIG = {
   appId: '1:621801689473:web:17ab4a7404dba4f1ec9880'
 };
 
-/** Firebase v10 modular SDK — CDN manzillari (Storage kiritilmagan). */
+/**
+ * Firebase v10 modular SDK — CDN manzillari (Storage kiritilmagan).
+ *
+ * DIQQAT: shu manzillar `index.html`, `admin/index.html` va
+ * `courier/index.html` dagi `modulepreload` teglarida ham takrorlangan
+ * (ular kritik yo'lni qisqartiradi). Versiyani o'zgartirsangiz uchala
+ * HTML faylni ham yangilang — aks holda preload behuda ketadi.
+ */
 export const FIREBASE_SDK = {
   app: 'https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js',
   auth: 'https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js',
@@ -168,13 +175,39 @@ let firebasePromise = null;
  * Faqat `js/db.js` va `js/auth.js` chaqiradi.
  * @returns {Promise<{app: object, auth: object, dbx: object, sdk: object}>}
  */
+/**
+ * Modulni import qiladi, yiqilsa BOSHQA manzil bilan bir marta qayta
+ * uriniladi.
+ *
+ * NEGA KERAK: `index.html` da Firebase SDK uchun `modulepreload`
+ * turadi. Preload yiqilsa (gstatic bir lahzaga yetib bo'lmasa —
+ * sekin LTE da bu oddiy hol) brauzer modulni "yiqilgan" deb belgilab
+ * qo'yadi va keyingi `import()` UMUMAN so'rov yubormasdan darhol xato
+ * qaytaradi. Sinovda aynan shu holat ilovani butunlay ochilmaydigan
+ * qilib qo'ygan edi.
+ *
+ * `?retry=` qo'shilgan manzil — brauzer uchun BOSHQA modul, shuning
+ * uchun u haqiqiy so'rov yuboradi.
+ *
+ * @param {string} url
+ * @returns {Promise<object>}
+ */
+async function importWithRetry(url) {
+  try {
+    return await import(/* @vite-ignore */ url);
+  } catch (e) {
+    console.warn('[config] modul yiqildi, qayta urinamiz:', url);
+    return import(/* @vite-ignore */ `${url}?retry=${Date.now()}`);
+  }
+}
+
 export function getFirebase() {
   if (!firebasePromise) {
     firebasePromise = (async () => {
       const [appSdk, authSdk, storeSdk] = await Promise.all([
-        import(/* @vite-ignore */ FIREBASE_SDK.app),
-        import(/* @vite-ignore */ FIREBASE_SDK.auth),
-        import(/* @vite-ignore */ FIREBASE_SDK.firestore)
+        importWithRetry(FIREBASE_SDK.app),
+        importWithRetry(FIREBASE_SDK.auth),
+        importWithRetry(FIREBASE_SDK.firestore)
       ]);
       const app = appSdk.initializeApp(FIREBASE_CONFIG);
       return {

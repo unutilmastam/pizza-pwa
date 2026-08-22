@@ -12,6 +12,7 @@
 /* eslint-disable no-unused-vars */
 
 import { getFirebase, STORAGE_KEYS } from './config.js';
+import { watchGuard, withTimeout } from './cache.js';
 
 /**
  * Menyu keshining yashash muddati (ms). Shu vaqt ichida Firestore'ga
@@ -72,7 +73,6 @@ function writeCache(key, value) {
  * beradi. Chegara qo'yilgach xato qaytadi, sahifa esa keshdagi
  * ma'lumotni ko'rsatadi yoki "qayta urinish" taklif qiladi.
  */
-const READ_TIMEOUT = 12000;
 
 /** Seans davomidagi xotira keshi — localStorage'dan tez. */
 const memory = new Map();
@@ -80,25 +80,9 @@ const memory = new Map();
 /** Fon rejimida ketayotgan yangilashlar — ikkilanmasin. */
 const inflight = new Map();
 
-/**
- * Va'daga vaqt chegarasi qo'yadi.
- * @template T
- * @param {Promise<T>} promise
- * @param {string} label - xato matnida ko'rinadi
- * @param {number} [ms]
- * @returns {Promise<T>}
- */
-function withTimeout(promise, label, ms = READ_TIMEOUT) {
-  let timer = null;
-  const guard = new Promise((_, reject) => {
-    timer = setTimeout(() => {
-      const error = new Error(`${label}: server javob bermadi`);
-      error.code = 'timeout';
-      reject(error);
-    }, ms);
-  });
-  return Promise.race([promise, guard]).finally(() => clearTimeout(timer));
-}
+// `withTimeout` va `watchGuard` — uchala ilova uchun umumiy
+// (`js/cache.js`). Bu yerda nusxasi yo'q: ikki xil chegara mantig'i
+// bo'lsa ular vaqt o'tib bir-biridan ajralib ketardi.
 
 /**
  * Keshdagi yozuvni oladi (avval xotira, keyin localStorage).
@@ -527,9 +511,14 @@ export function watchOrder(orderId, onChange, onError) {
 
   getFirebase().then(({ dbx, sdk }) => {
     if (cancelled) return;
-    stop = sdk.onSnapshot(
-      sdk.doc(dbx, 'orders', orderId),
-      (snap) => onChange(snap.exists() ? { id: snap.id, ...snap.data() } : null),
+    // `watchGuard` — birinchi snapshot kelmasa sahifa abadiy kutmasin
+    stop = watchGuard(
+      (data, err) => sdk.onSnapshot(
+        sdk.doc(dbx, 'orders', orderId),
+        (snap) => data(snap.exists() ? { id: snap.id, ...snap.data() } : null),
+        err
+      ),
+      onChange,
       (error) => {
         console.error('[db] watchOrder xatosi:', error);
         if (onError) onError(error);
@@ -559,14 +548,18 @@ export function watchActiveOrders(uid, onChange, onError) {
 
   getFirebase().then(({ dbx, sdk }) => {
     if (cancelled || !uid) return;
-    stop = sdk.onSnapshot(
-      sdk.query(sdk.collection(dbx, 'orders'), sdk.where('uid', '==', uid)),
-      (snap) => {
-        const list = snap.docs
-          .map((d) => ({ id: d.id, ...d.data() }))
-          .filter((o) => !FINAL_STATUSES.includes(o.status));
-        onChange(byNewest(list));
-      },
+    stop = watchGuard(
+      (data, err) => sdk.onSnapshot(
+        sdk.query(sdk.collection(dbx, 'orders'), sdk.where('uid', '==', uid)),
+        (snap) => {
+          const list = snap.docs
+            .map((d) => ({ id: d.id, ...d.data() }))
+            .filter((o) => !FINAL_STATUSES.includes(o.status));
+          data(byNewest(list));
+        },
+        err
+      ),
+      onChange,
       (error) => {
         console.error('[db] watchActiveOrders xatosi:', error);
         if (onError) onError(error);
