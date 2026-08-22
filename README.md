@@ -81,6 +81,26 @@ domains** ro'yxatiga sayt domenini qo'shish kerak.
 > o'zgarsa foydalanuvchi darhol yangisini oladi. Boshqa fayl o'zgarsa
 > `sw.js` dagi `VERSION` ni oshiring, aks holda eski kesh qoladi.
 
+### Tezlik: nimaga tegmaslik kerak
+
+Sekin tarmoqda (LTE) ilova tezligi ikki narsaga bog'liq, ikkalasi ham
+o'lchov bilan tanlangan — o'zgartirishdan oldin qayta o'lchang
+(usul `docs/PROGRESS.md` dagi "TEZLIK — 2-TUZATISH" bo'limida).
+
+1. **`modulepreload` ro'yxatlari** uchala `index.html` da. ES importlar
+   daraja-daraja yuklanadi va sekin tarmoqda har daraja bir
+   borib-kelish. Preloadsiz admin paneli 10.9 sekundda ochilardi,
+   preload bilan 6.4 sekundda. **Yangi modul qo'shsangiz ro'yxatga ham
+   qo'shing**, aks holda u yana zanjirning oxiriga tushadi.
+2. **`js/cache.js`** — uchala ilova uchun umumiy kesh. Yangi Firestore
+   o'qishi yozsangiz uni `swr()` orqali o'tkazing va `withTimeout()`
+   bilan o'rang; `onSnapshot` ni esa `watchGuard()` ga bering.
+   Chegarasiz `onSnapshot` ulanish yo'qolganda XATO BERMAYDI — jim
+   turadi va ekran spinnerda qotib qoladi.
+
+`FIREBASE_SDK` versiyasini o'zgartirsangiz uchala HTML dagi gstatic
+`modulepreload` manzillarini ham yangilang.
+
 ## Node servis (`server/`)
 
 Servis faqat client bajara olmaydigan ishlarni qiladi (SPEC 4-bo'lim):

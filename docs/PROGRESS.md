@@ -866,3 +866,79 @@ Tuzatishlardan keyin qayta tekshirildi:
   o'tdi, geolokatsiya endi `courierLocations` ga yozilishi va
   hujjatda faqat uch maydon bo'lishi alohida tekshirildi;
 - `/api/health` 200, `?deep=1` tokensiz va soxta token bilan 401.
+
+### TEZLIK — 2-TUZATISH (o'lchov bilan)
+
+Sekinlik uchala ilovada qaytdi: "bo'limga o'tsam yuklanish belgisi
+turib qoladi, sahifani tortib yangilagandan keyin ochiladi".
+
+Taxmin qilinmadi — **o'lchandi**. Sekin tarmoq taqlid qilindi (har
+HTTP so'rovga +1.5 s, Firestore amali 1.2 s, birinchi ulanish +1.8 s)
+va uchala ilovada boot sharsharasi hamda sahifa o'tishlari profil
+qilindi (`scratchpad/prof/`, haqiqiy kod ustida — soxta faqat
+Firebase SDK va Node servis).
+
+**Topilgan sabablar** (foydalanuvchi taxminlariga javob bilan):
+
+1. **Modul grafigi chuqurligi — ASOSIY SABAB.** ES importlar
+   daraja-daraja yuklanadi. Admin zanjiri OLTI daraja edi:
+   `index.html → app.js → (router, config, i18n, ui, auth, api, db)
+   → ../../js/config.js → gstatic SDK → getDoc(staff)`.
+   Har daraja bir RTT. Sub-ilovalarning `config.js` i mijoznikidan
+   re-eksport qilgani butun bir qo'shimcha daraja qo'shgan.
+2. **Firebase SDK gstatic'dan, kritik yo'lda** (1-taxmin — TASDIQLANDI):
+   zanjirning 5-darajasida turgan va SW uni keshlay olmaydi.
+3. **Admin/kuryer karkasi tarmoq o'qishini kutgan:** admin
+   `getDoc(staff)` ni 3 s, kuryer `POST /api/courier/claim` ni 1.5 s
+   (Render uyquda bo'lsa 50 s gacha) kutib bo'sh ekran ko'rsatgan.
+4. **Admin va kuryerda kesh umuman yo'q edi:** bir seansda
+   `menu/current` 4 marta, `branches` 3 marta o'qilgan; kuryerda
+   `GET /api/courier/report` har tab almashuvida qayta chaqirilgan.
+5. **`onSnapshot` da chegara yo'q edi.** U ulanish yo'qolganda XATO
+   BERMAYDI — jim turadi. Uzilish sinovida admin va kuryer 20
+   sekunddan keyin ham spinner ko'rsatgan. Aynan shu — foydalanuvchi
+   ko'rgan alomat. `admin/js/db.js` da bir martalik o'qishlarda ham
+   chegara yo'q edi.
+6. **SW "tarmoq birinchi"** (2-taxmin — qisman): har qayta ochilish
+   tarmoq tezligiga bog'langan (1.8 s) va uzilganda umuman ochilmagan.
+7. **Rasmlar (4-taxmin) — SABAB EMAS.** O'lchov: ular `loading="lazy"`
+   bilan, kartochkalar chizilgandan KEYIN (7303→7328 ms) yuklanadi va
+   hech nimani to'smaydi.
+8. **Render uyqusi (3-taxmin) — mijozda sabab emas** (`wakeUp()` fon
+   rejimida), lekin **kuryerda sabab edi** — `claim` kritik yo'lda.
+
+**Tuzatishlar:**
+
+- `js/cache.js` — uchala ilova uchun UMUMIY qatlam: `withTimeout()`,
+  `createCache()` (stale-while-revalidate) va `watchGuard()`
+  (`onSnapshot` uchun birinchi javob chegarasi; obuna uzilmaydi,
+  kechikkan javob baribir ishlatiladi).
+- Uchala `index.html` ga `modulepreload` va gstatic uchun
+  `preconnect` — grafik yassilandi, zanjir 6 darajadan 2 ga tushdi.
+- Admin va kuryer keshga o'tdi; `admin/js/db.js` dagi barcha o'qishlar
+  endi chegara bilan.
+- Admin karkasi keshdagi rol bilan, kuryer keshdagi hujjat bilan
+  DARHOL ochiladi; tekshiruv fonda ketadi. Xavfsiz, chunki rol faqat
+  qaysi bo'lim ko'rinishini belgilaydi — huquqni `firestore.rules` va
+  servis beradi.
+- Kuryer buyurtmalari va kunlik hisobi keshdan darhol chiqadi.
+- `admin/sw.js` va `courier/sw.js` — "tarmoq birinchi" saqlandi,
+  lekin 2.5 s chegara bilan: yaxshi tarmoqda hech nima o'zgarmadi,
+  sekin tarmoqda keshdagi karkas beriladi.
+- **Yo'l-yo'lakay topilgan yangi xavf:** `modulepreload` yiqilsa
+  brauzer modulni "yiqilgan" deb belgilab qo'yadi va keyingi
+  `import()` UMUMAN so'rov yubormaydi — ilova butunlay ochilmaydi.
+  Sinovda tasdiqlandi. `importWithRetry()` qo'shildi: yiqilsa
+  `?retry=` bilan qayta so'raydi (brauzer uchun boshqa modul).
+
+**Natija (1.5 s/so'rov taqlidida):**
+
+| | sovuq ochilish | issiq (2-ochilish) | takroriy o'tish |
+| --- | --- | --- | --- |
+| Mijoz | 7373 → **4375 ms** | to'liq boot → **83 ms** | 1300 → **15–35 ms** |
+| Admin | 10907 → **6361 ms** | to'liq boot → **1862 ms** | 1300 → **13–17 ms** |
+| Kuryer | 9375 → **4853 ms** | to'liq boot → **1843 ms** | 1800 → **30–39 ms** |
+
+Tarmoq uzilishi sinovi: oldin admin va kuryer 20 sekunddan keyin ham
+spinner ko'rsatardi — endi uchalasi ham keshdagi ma'lumotni yoki
+"qayta urinish" tugmasini beradi. **Cheksiz spinner qolmadi.**

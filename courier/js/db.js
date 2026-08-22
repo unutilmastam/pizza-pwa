@@ -5,41 +5,23 @@
  *
  * Nimani kuryer O'ZI yozadi va nimani servis yozadi (SPEC 3-bo'lim va
  * `firestore.rules`):
- *  - `couriers/{uid}` → kuryer FAQAT `location`, `onShift`,
- *    `activeOrders`, `shiftStartedAt`, `shiftEndedAt` maydonlarini
- *    yozadi. Ism, telefon, filial — admin panelidan.
+ *  - `couriers/{uid}` → kuryer FAQAT `onShift`, `activeOrders`,
+ *    `shiftStartedAt`, `shiftEndedAt` maydonlarini yozadi. Ism,
+ *    telefon, filial — admin panelidan.
+ *  - `courierLocations/{uid}` → joylashuv ALOHIDA hujjatda (sabab
+ *    `saveLocation()` izohida).
  *  - `orders` → kuryer FAQAT O'QIYDI (`courierId == uid` bo'lganini).
  *    Status o'zgarishi Node servis orqali (`courier/js/api.js`).
  */
 
 import { getFirebase } from './config.js';
-
-/** Bitta Firestore o'qishiga vaqt chegarasi (ms). */
-const READ_TIMEOUT = 12000;
+import { createCache, withTimeout, watchGuard } from '../../js/cache.js';
 
 /**
- * Va'daga vaqt chegarasi qo'yadi.
- *
- * Firestore SDK bir martalik o'qishga o'z chegarasini qo'ymaydi —
- * ulanish osilib qolsa va'da hech qachon tugamaydi va ekran
- * skeletonda muzlab qoladi (mijoz ilovasida shu bilan uchrashilgan).
- *
- * @template T
- * @param {Promise<T>} promise
- * @param {string} label
- * @returns {Promise<T>}
+ * Kuryer keshi — kunlik hisob va buyurtmalar shu yerdan darhol
+ * ko'rsatiladi, tarmoq javobi esa fonda keladi.
  */
-function withTimeout(promise, label) {
-  let timer = null;
-  const guard = new Promise((_, reject) => {
-    timer = setTimeout(() => {
-      const error = new Error(`${label}: server javob bermadi`);
-      error.code = 'timeout';
-      reject(error);
-    }, READ_TIMEOUT);
-  });
-  return Promise.race([promise, guard]).finally(() => clearTimeout(timer));
-}
+export const cache = createCache('pizza.courier.cache.v1');
 
 /* ------------------------------------------------------------- kuryer */
 
@@ -70,9 +52,13 @@ export function watchCourier(uid, onChange, onError) {
 
   getFirebase().then(({ dbx, sdk }) => {
     if (cancelled || !uid) return;
-    stop = sdk.onSnapshot(
-      sdk.doc(dbx, 'couriers', uid),
-      (snap) => onChange(snap.exists() ? { id: snap.id, ...snap.data() } : null),
+    stop = watchGuard(
+      (data, err) => sdk.onSnapshot(
+        sdk.doc(dbx, 'couriers', uid),
+        (snap) => data(snap.exists() ? { id: snap.id, ...snap.data() } : null),
+        err
+      ),
+      onChange,
       (error) => {
         console.error('[db] watchCourier xatosi:', error);
         if (onError) onError(error);
@@ -154,10 +140,15 @@ export function watchMyOrders(uid, onChange, onError) {
 
   getFirebase().then(({ dbx, sdk }) => {
     if (cancelled || !uid) return;
-    stop = sdk.onSnapshot(
-      sdk.query(sdk.collection(dbx, 'orders'), sdk.where('courierId', '==', uid)),
-      (snap) => {
-        const list = snap.docs.map((d) => ({ id: d.id, ...d.data() }));
+    stop = watchGuard(
+      (data, err) => sdk.onSnapshot(
+        sdk.query(sdk.collection(dbx, 'orders'), sdk.where('courierId', '==', uid)),
+        (snap) => data(snap.docs.map((d) => ({ id: d.id, ...d.data() }))),
+        err
+      ),
+      (list) => {
+        // Keshga yozamiz — keyingi ochilishda ro'yxat darhol chiqadi
+        cache.write(`orders.${uid}`, list);
         onChange(list);
       },
       (error) => {
@@ -174,4 +165,17 @@ export function watchMyOrders(uid, onChange, onError) {
     cancelled = true;
     stop();
   };
+}
+
+/**
+ * Keshdagi buyurtmalar — tarmoqsiz, darhol.
+ *
+ * Oqim birinchi javobni kutayotganda ekran bo'sh turmasin: eski
+ * ro'yxat ko'rsatiladi va yangisi kelganda almashadi.
+ *
+ * @param {string} uid
+ * @returns {?object[]}
+ */
+export function peekMyOrders(uid) {
+  return cache.peek(`orders.${uid}`);
 }

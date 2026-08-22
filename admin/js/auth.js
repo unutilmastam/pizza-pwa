@@ -14,7 +14,7 @@
 
 import { getFirebase } from './config.js';
 import { ROLE_SECTIONS } from './config.js';
-import { getStaff } from './db.js';
+import { getStaff, peekStaff, clearCache } from './db.js';
 import { request } from './api.js';
 
 /** @type {?object} joriy xodim: {uid, role, name, branchIds, active} */
@@ -178,6 +178,9 @@ export async function signOut() {
   } catch (e) {
     console.warn('[auth] signOut xatosi:', e);
   }
+  // Keshdagi rol qolib ketmasin — boshqa xodim shu qurilmadan kirsa
+  // eski bo'limlarni ko'rib qolardi
+  clearCache();
   staff = null;
   emit();
 }
@@ -208,6 +211,26 @@ export function initAuth() {
           }
           return;
         }
+        // KESHDAGI ROL BILAN DARHOL OCHAMIZ.
+        //
+        // O'lchovda (1.5 s/so'rov) `getDoc(staff)` panelni 3 sekund
+        // ushlab turardi — foydalanuvchi bo'sh ekranga qarardi.
+        // Rol faqat QAYSI BO'LIM ko'rinishini hal qiladi; haqiqiy
+        // huquqni `firestore.rules` beradi, shuning uchun keshdagi
+        // rol bilan panelni ochish xavfsiz. Tekshiruv fonda ketadi
+        // va rol o'zgargan bo'lsa sessiya yopiladi.
+        const cached = peekStaff(user.uid);
+        if (cached && !settled) {
+          staff = cached;
+          settled = true;
+          emit();
+          resolve(cached);
+          loadStaff(user.uid, user.phoneNumber).catch((e) => {
+            console.warn('[auth] fon tekshiruvi:', e.code || e.message);
+          });
+          return;
+        }
+
         try {
           const doc = await loadStaff(user.uid, user.phoneNumber);
           if (!settled) {
