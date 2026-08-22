@@ -96,7 +96,8 @@ export async function claimCourier({ uid, phone }) {
     branchId: data.branchId || null,
     // Kirish paytida smena YOPIQ — kuryer o'zi ochadi
     onShift: false,
-    location: data.location || null,
+    // Joylashuv bu hujjatda saqlanmaydi — u `courierLocations/{uid}` da
+    // (mijoz trekingi o'sha yerni o'qiydi, ism va telefonni emas).
     activeOrders: [],
     active: true,
     createdAt: data.createdAt || Timestamp.now(),

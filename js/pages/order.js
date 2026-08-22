@@ -10,7 +10,9 @@ import { t, pick } from '../i18n.js';
 import { el, emptyState, skeleton, toast, bottomSheet, confirm as confirmDialog, loader } from '../ui.js';
 import { formatPrice, formatDate, formatCountdown, formatPhone, toDate, haptic } from '../utils.js';
 import { APP, DEFAULT_CENTER } from '../config.js';
-import { getOrders, watchOrder, watchCourier, saveRating, invalidateOrders } from '../db.js';
+import {
+  getOrders, watchOrder, watchCourierLocation, saveRating, invalidateOrders
+} from '../db.js';
 import { cancelOrder } from '../api.js';
 import { getState, addToCart } from '../state.js';
 import { navigate, back } from '../router.js';
@@ -366,8 +368,7 @@ function courierMap(order) {
 
       // Kuryer koordinatasi real vaqtda ko'chadi
       if (order.courierId) {
-        const stop = watchCourier(order.courierId, (courier) => {
-          const loc = courier && courier.location;
+        const stop = watchCourierLocation(order.courierId, (loc) => {
           if (!loc || typeof loc.lat !== 'number') return;
           console.log('[order] kuryer ko\'chdi:', loc.lat, loc.lng);
           pin.geometry.setCoordinates([loc.lat, loc.lng]);

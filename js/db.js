@@ -585,22 +585,28 @@ export function watchActiveOrders(uid, onChange, onError) {
 
 /**
  * Kuryer joylashuvini real-time kuzatadi.
+ *
+ * `courierLocations/{uid}` — ATAYLAB alohida kolleksiya. Unda faqat
+ * `{lat, lng, at}` bor. Kuryerning ismi va telefoni `couriers` da
+ * qoladi va mijozga ochiq emas — treking uchun ular buyurtma
+ * hujjatidan olinadi (`courierName`, `courierPhone`).
+ *
  * @param {string} courierId
- * @param {(courier: ?object) => void} onChange
+ * @param {(location: ?{lat: number, lng: number, at: *}) => void} onChange
  * @returns {() => void}
  */
-export function watchCourier(courierId, onChange) {
+export function watchCourierLocation(courierId, onChange) {
   let stop = null;
   let cancelled = false;
 
   getFirebase().then(({ dbx, sdk }) => {
     if (cancelled || !courierId) return;
     stop = sdk.onSnapshot(
-      sdk.doc(dbx, 'couriers', courierId),
+      sdk.doc(dbx, 'courierLocations', courierId),
       (snap) => onChange(snap.exists() ? { id: snap.id, ...snap.data() } : null),
-      (error) => console.error('[db] watchCourier xatosi:', error)
+      (error) => console.error('[db] watchCourierLocation xatosi:', error)
     );
-  }).catch((error) => console.error('[db] watchCourier ulanmadi:', error));
+  }).catch((error) => console.error('[db] watchCourierLocation ulanmadi:', error));
 
   return () => {
     cancelled = true;

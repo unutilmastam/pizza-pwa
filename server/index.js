@@ -46,11 +46,26 @@ app.use(cors());
  */
 const wrap = (handler) => (req, res, next) => Promise.resolve(handler(req, res, next)).catch(next);
 
+/**
+ * Middleware'ni FAQAT `?deep=1` so'rovida ishlatadi.
+ *
+ * Oddiy `/api/health` ochiq qolishi kerak — uni tashqi ping xizmati
+ * (Render uyqusiga qarshi) autentifikatsiyasiz chaqiradi. `?deep=1` esa
+ * diagnostika: u Firestore'ga so'rov yuboradi va xizmat akkaunti
+ * haqida ma'lumot qaytaradi, shuning uchun yopiq bo'lishi shart.
+ *
+ * @param {import('express').RequestHandler} middleware
+ * @returns {import('express').RequestHandler}
+ */
+const deepOnly = (middleware) => (req, res, next) => (
+  req.query.deep ? middleware(req, res, next) : next()
+);
+
 // --- Health ---------------------------------------------------------------
 // Render bepul planida servis uxlaydi. Tashqi ping xizmati shu manzilni
 // chaqirib turadi; javob yengil bo'lishi uchun Firestore faqat
-// `?deep=1` bilan tekshiriladi.
-app.get('/api/health', wrap(async (req, res) => {
+// `?deep=1` bilan tekshiriladi — u esa `ADMIN_UIDS` uchun.
+app.get('/api/health', deepOnly(requireAuth), deepOnly(requireAdmin), wrap(async (req, res) => {
   const problems = checkConfig();
   const body = {
     ok: problems.length === 0,
