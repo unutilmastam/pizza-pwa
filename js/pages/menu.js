@@ -165,7 +165,16 @@ export function render() {
   async function load() {
     try {
       const branchId = getState().branchId;
-      const [menu, stopList] = await Promise.all([getMenu(), getStopList(branchId)]);
+      // Ikkalasi ham keshdan darhol keladi; stop-list fonda yangilansa
+      // ro'yxat o'zi qayta chiziladi (tarmoq kutilmaydi).
+      let current = null;
+      const [menu, stopList] = await Promise.all([
+        getMenu(),
+        getStopList(branchId, (fresh) => {
+          if (current) fill(current, fresh);
+        })
+      ]);
+      current = menu;
       fill(menu, stopList);
     } catch (e) {
       console.error('Menyu yuklanmadi:', e);
