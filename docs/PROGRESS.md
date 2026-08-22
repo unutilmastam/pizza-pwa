@@ -645,7 +645,7 @@ Izoh:
 ---
 
 ## Bosqich 9 — kuryer ilovasi
-Status: **joriy**
+Status: **bajarildi**
 
 `courier/` — alohida PWA (SPEC 122–128)
 
@@ -727,3 +727,91 @@ oldin ular ochilmasa, kuryer hech narsa ko'ra olmaydi:
   panelga kira olmaydi va bu shundayligicha qoladi.
 
 Izoh:
+
+**QABUL QILINGAN QARORLAR** (uchala to'siq shu bilan yopildi):
+
+1. **Hujjat ID = `uid`** (yuqoridagi (a) yo'li). Admin kuryer
+   qo'shganda `couriers/pending_<telefon raqamlari>` hujjati
+   yaratiladi. Kuryer birinchi marta kirganda
+   `POST /api/courier/claim` uni topib `couriers/{uid}` ga
+   KO'CHIRADI va `pending_` hujjatini o'chiradi (bitta `batch`).
+   Shundan keyin `firestore.rules` dagi `isOwner(courierId)` ishlaydi.
+   `pending_` kuryerga buyurtma tayinlab bo'lmaydi — `assignCourier()`
+   409 `courier-pending` qaytaradi, admin panelning tayinlash
+   ro'yxatida ham u ko'rinmaydi.
+2. **Geolokatsiya yozuvi UCHALA shart birga bajarilgandagina:**
+   smena ochiq; oxirgi YOZILGAN nuqtadan 50 metrdan ortiq siljigan;
+   ilova old planda (`visibilitychange` bilan to'xtaydi). Qo'shimcha
+   shart: kuryerda `on_way` statusidagi buyurtma bo'lishi kerak.
+   Taymer har 15 sekundda TEKSHIRADI, lekin yozuv shartlarsiz
+   bo'lmaydi — kvota shu bilan saqlanadi (kuryer to'xtab turganda,
+   fonda yoki bo'sh yurganda yozuv umuman ketmaydi).
+3. **`courier` roli qoidalarga qo'shildi:** `orders` read — `isMyDelivery()`
+   (`resource.data.courierId == request.auth.uid`); status o'zgartirish
+   faqat servis orqali, faqat o'ziga tayinlanganini va faqat `on_way` /
+   `delivered` ga.
+
+Bajarilgani:
+
+- **Servis** (`server/src/couriers.js` + `server/index.js` da 3 yo'l):
+  - `POST /api/courier/claim` — `couriers/{uid}` ni topadi yoki
+    `pending_` dan ko'chiradi; ikkalasi ham yo'q bo'lsa 403
+    `not-courier`, `active: false` bo'lsa 403 `courier-disabled`.
+  - `PATCH /api/orders/:id/courier-status` — egalikni
+    (`order.courierId === uid`) va statusni (`on_way`/`delivered`)
+    SERVERDA tekshiradi; `delivered` da `courierClosedAt` va naqd
+    buyurtmada `cashCollected` yoziladi, buyurtma kuryerning
+    `activeOrders` ro'yxatidan `arrayRemove` bilan chiqadi.
+  - `GET /api/courier/report` — kunlik hisob (`summarizeOrders()` sof
+    funksiyasi). Sana MAHALLIY hisoblanadi: `toISOString()` UTC ga
+    o'tkazib Toshkent vaqtida kunni bir kun orqaga surar edi.
+  - `assignCourier()` endi `pending_` kuryerni rad etadi (409).
+- **Qoidalar** (`firestore.rules`): `isMyDelivery()` qo'shildi, `orders`
+  read shunga kengaytirildi; `couriers` update maydonlari ro'yxatiga
+  `shiftStartedAt`/`shiftEndedAt` qo'shildi. `rules-test/` ga 8 ta
+  yangi test — jami **56 ta test o'tdi** (haqiqiy emulyatorda).
+- **Kuryer PWA** (`courier/`, 13 fayl): o'z `manifest.json` va `sw.js`
+  (TARMOQ BIRINCHI — xodim eski kod bilan qolmasin), ildizdagi `sw.js`
+  endi `/courier/` ni ham chetlab o'tadi (VERSION `v12`). Router yo'q —
+  ikki tab (buyurtmalar, hisob). Mobil uchun: 56px teginish maydonlari,
+  `[hidden] { display: none !important; }`.
+  - `courier/js/geo.js` — yuqoridagi 2-qaror shu yerda; `distanceMeters()`
+    haversine, oxirgi nuqta `localStorage` da (ilova qayta ochilganda
+    yaqin joydan yana yozib yubormaslik uchun).
+  - `courier/js/db.js` — barcha bir martalik o'qish `withTimeout()`
+    ichida (Firestore SDK o'z chegarasini qo'ymaydi; mijoz ilovasidagi
+    "skeletonda muzlab qolish" shundan edi).
+  - Navigator: `yandexnavi://` deep link, 1200 ms dan keyin sahifa
+    hamon ko'rinib tursa `https://yandex.uz/maps/?rtext=~lat,lng`.
+- **Admin panel** — "Kuryerlar" bo'limi (`admin/js/pages/couriers.js`):
+  CRUD, kutilayotganlar ro'yxat tepasida "kirishi kutilmoqda" belgisi
+  bilan, kirgan kuryerda telefon QULFLANGAN (u hujjat ID sining
+  asosi), faol buyurtmali kuryer o'chirilmaydi. Bo'lim
+  superadmin/manager/operator uchun ochiq (buyurtmani operator
+  tayinlaydi).
+- Tekshirildi — brauzerda, HAQIQIY kod ustida (Firestore SDK va Node
+  servis soxta):
+  - kuryer ilovasi, 13 guruh: OTP → `claim`; kuryer bo'lmagan raqam
+    kira olmadi; faqat o'ziga tayinlangan 2 buyurtma ko'rindi (boshqa
+    kuryerniki ham, yetkazilgani ham chiqmadi); "Oldim" `on_way`
+    yubordi; naqd buyurtmada pul so'raldi va "yo'q" da so'rov ketmadi,
+    "ha" da `cashCollected: true` ketdi; kartada pul oynasi chiqmadi;
+    smena ochildi/yopildi va faol buyurtma bilan yopilmadi;
+    **geolokatsiya**: smena yopiq — yozuv yo'q, uchala shart
+    bajarilganda 1 yozuv, 50 m dan kam siljishda yozilmadi, ortiq
+    siljishda yozildi, fonda yozilmadi, yo'lda buyurtma qolmaganda
+    yozilmadi; masofa hisobi (0 / ~50 m / ~1 km) to'g'ri; kunlik
+    hisob 6 ko'rsatkich bilan chiqdi; servis xatosi toast bilan
+    ko'rsatildi va tugma qayta faollashdi; admin `active: false`
+    qilganda sessiya yopildi; tab almashuvida obuna oqmadi;
+  - admin "Kuryerlar", 9 guruh: bo'lim menyuda (superadmin va
+    operator ko'rdi, oshxona ko'rmadi); kutilayotgan tepada; yangi
+    kuryer `pending_998903334455` ID bilan yozildi; ismsiz, noto'g'ri
+    va takror raqam saqlanmadi; kirgan kuryerda telefon `readonly` va
+    yozuv `uid` ID ga ketdi; kutilayotganda telefon tahrirlandi; faol
+    buyurtmali kuryer o'chirilmadi, bo'shi o'chdi; tayinlash
+    ro'yxatida kutilayotgan va smenadan tashqaridagi chiqmadi;
+    ruscha tilda kalitlar qolib ketmadi;
+  - `server/npm test` — **30 ta test o'tdi** (7 tasi yangi: `pendingId`,
+    ruxsat etilgan statuslar, hisob yig'indisi).
+- README.md ga "Kuryer ilovasi" bo'limi qo'shildi.

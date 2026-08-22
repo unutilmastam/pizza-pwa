@@ -93,6 +93,17 @@ service cloud.firestore {
     }
 
     /**
+     * Buyurtma AYNAN shu kuryerga tayinlanganmi.
+     *
+     * Kuryer BARCHA buyurtmalarni emas, faqat o'ziga tayinlanganini
+     * ko'radi. `courierId` — `couriers/{uid}` hujjatining ID si, ya'ni
+     * kuryerning Firebase `uid` si (`server/src/couriers.js` ga qarang).
+     */
+    function isMyDelivery() {
+      return signedIn() && resource.data.courierId == request.auth.uid;
+    }
+
+    /**
      * So'rov faqat shu maydonlarga tegyaptimi.
      * @param allowed ruxsat etilgan maydonlar
      */
@@ -171,10 +182,14 @@ service cloud.firestore {
     /* ----------------------------------------------------- buyurtma */
 
     match /orders/{orderId} {
-      // Mijoz faqat o'zinikini. Client `where('uid','==',auth.uid)` bilan
-      // so'raydi — shu sababli ro'yxat so'rovi ham o'tadi.
+      // Mijoz faqat o'zinikini, kuryer faqat o'ziga tayinlanganini.
+      // Client `where('uid','==',auth.uid)`, kuryer ilovasi esa
+      // `where('courierId','==',auth.uid)` bilan so'raydi — shu sababli
+      // ro'yxat so'rovlari ham o'tadi.
       allow read: if signedIn()
-                     && (resource.data.uid == request.auth.uid || isOrderStaff());
+                     && (resource.data.uid == request.auth.uid
+                         || isMyDelivery()
+                         || isOrderStaff());
 
       // Buyurtmani FAQAT Node servis yaratadi (narxni u qayta hisoblaydi)
       allow create: if false;
@@ -197,9 +212,12 @@ service cloud.firestore {
       // ular buyurtma hujjatida ham mijozga ko'rsatiladi.
       allow read: if signedIn();
 
-      // Kuryer faqat O'Z joylashuvini yozadi
+      // Kuryer faqat O'Z joylashuvi va smenasini yozadi.
+      // `activeOrders` ni ham servis yozadi, lekin kuryer ilovasi
+      // buyurtmani yopganda mahalliy ro'yxatni tozalashi mumkin.
       allow update: if isOwner(courierId)
-                       && onlyChanges(['location', 'onShift', 'activeOrders']);
+                       && onlyChanges(['location', 'onShift', 'activeOrders',
+                                       'shiftStartedAt', 'shiftEndedAt']);
       allow create, delete: if hasRole(['superadmin', 'manager']);
     }
 

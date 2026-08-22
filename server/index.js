@@ -20,6 +20,9 @@ import {
 } from './src/orders.js';
 import { startCron, runGuaranteeJob, runBonusJob, runReportJob } from './src/cron.js';
 import {
+  claimCourier, courierUpdateStatus, courierReport
+} from './src/couriers.js';
+import {
   cors, requireAuth, requireAdmin, requireStaff, rateLimit, errorHandler
 } from './src/middleware.js';
 
@@ -161,6 +164,35 @@ app.patch('/api/orders/:id/status', requireAuth, requireStaff(ORDER_ROLES), wrap
 app.patch('/api/orders/:id/cancel', requireAuth, rateLimit({ windowMs: 60000, max: 10 }), wrap(async (req, res) => {
   const result = await cancelOwnOrder({ orderId: req.params.id, uid: req.user.uid });
   res.json(result);
+}));
+
+/* ------------------------------------------------------------ kuryer */
+
+// Kuryer birinchi marta kirganda `pending_<telefon>` hujjati
+// `couriers/{uid}` ga ko'chiriladi (SPEC 122).
+app.post('/api/courier/claim', requireAuth, rateLimit({ windowMs: 60000, max: 20 }), wrap(async (req, res) => {
+  const courier = await claimCourier({ uid: req.user.uid, phone: req.user.phone });
+  res.json(courier);
+}));
+
+// Kuryer O'ZIGA tayinlangan buyurtma statusini o'zgartiradi.
+// `requireStaff` YO'Q: kuryer `staff` da bo'lmasligi mumkin —
+// egalik va ruxsat etilgan status `courierUpdateStatus()` da
+// tekshiriladi (faqat on_way / delivered, faqat o'zinikiga).
+app.patch('/api/orders/:id/courier-status', requireAuth, rateLimit({ windowMs: 60000, max: 60 }), wrap(async (req, res) => {
+  const result = await courierUpdateStatus({
+    orderId: req.params.id,
+    uid: req.user.uid,
+    status: String(req.body?.status || ''),
+    cashCollected: Boolean(req.body?.cashCollected)
+  });
+  res.json(result);
+}));
+
+// Kunlik hisob (SPEC 128)
+app.get('/api/courier/report', requireAuth, wrap(async (req, res) => {
+  const report = await courierReport({ uid: req.user.uid, date: req.query.date });
+  res.json(report);
 }));
 
 // Kuryer tayinlash (SPEC 110)

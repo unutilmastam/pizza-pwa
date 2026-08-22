@@ -92,13 +92,55 @@ export async function getOrdersBetween(from, to) {
 /* -------------------------------------------------------------- kuryer */
 
 /**
- * Smenadagi kuryerlar.
+ * Barcha kuryerlar (kutilayotganlar bilan birga).
  * @returns {Promise<object[]>}
  */
 export async function getCouriers() {
   const { dbx, sdk } = await getFirebase();
   const snap = await sdk.getDocs(sdk.collection(dbx, 'couriers'));
   return snap.docs.map((d) => ({ id: d.id, ...d.data() }));
+}
+
+/**
+ * Hali ilovaga kirmagan kuryerning vaqtinchalik hujjat ID si.
+ *
+ * Servisdagi `pendingId()` bilan BIR XIL bo'lishi shart
+ * (`server/src/couriers.js`) — kuryer birinchi kirganda servis aynan
+ * shu ID bo'yicha hujjatni topib `couriers/{uid}` ga ko'chiradi.
+ *
+ * @param {string} phone
+ * @returns {string}
+ */
+export function courierPendingId(phone) {
+  return `pending_${String(phone || '').replace(/\D/g, '')}`;
+}
+
+/**
+ * Kuryerni yozadi.
+ *
+ * ID har doim tashqaridan beriladi: yangi kuryerda `pending_<telefon>`,
+ * kirganida esa uning `uid` si. Shuning uchun bu yerda avtomatik ID
+ * yaratilmaydi (filiallardan farqi shunda).
+ *
+ * @param {string} id
+ * @param {object} data
+ * @returns {Promise<string>}
+ */
+export async function saveCourier(id, data) {
+  const { dbx, sdk } = await getFirebase();
+  const ref = sdk.doc(dbx, 'couriers', id);
+  await sdk.setDoc(ref, { ...data, updatedAt: sdk.serverTimestamp() }, { merge: true });
+  return ref.id;
+}
+
+/**
+ * Kuryerni o'chiradi.
+ * @param {string} id
+ * @returns {Promise<void>}
+ */
+export async function deleteCourier(id) {
+  const { dbx, sdk } = await getFirebase();
+  await sdk.deleteDoc(sdk.doc(dbx, 'couriers', id));
 }
 
 /* ---------------------------------------------------------------- menyu */

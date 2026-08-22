@@ -11,7 +11,7 @@
  * Statik fayl mazmuni o'zgarsa — VERSION ni oshiring.
  */
 
-const VERSION = 'v11';
+const VERSION = 'v12';
 const SHELL_CACHE = `pizza-shell-${VERSION}`;
 const RUNTIME_CACHE = `pizza-runtime-${VERSION}`;
 
@@ -141,10 +141,12 @@ self.addEventListener('fetch', (event) => {
   // Tashqi xizmatlar (Firebase, Node servis, Yandex Maps) — to'g'ridan-to'g'ri
   if (url.origin !== self.location.origin) return;
 
-  // Admin panelning O'Z service worker'i bor (`admin/sw.js`) va u tarmoq
-  // birinchi tamoyilida ishlaydi. Bu SW ning scope'i kengroq bo'lgani
-  // uchun admin fayllari ham unga tushib qolmasin — chetlab o'tamiz.
-  if (url.pathname.includes('/admin/')) return;
+  // Admin va kuryer ilovalarining O'Z service worker'lari bor
+  // (`admin/sw.js`, `courier/sw.js`) va ular TARMOQ BIRINCHI tamoyilida
+  // ishlaydi. Bu SW ning scope'i kengroq (`/pizza-pwa/`) bo'lgani uchun
+  // ularning fayllari bunga tushib, "keshdan ber" strategiyasi bilan
+  // xodimni eski kod bilan qoldirib qo'yishi mumkin — chetlab o'tamiz.
+  if (url.pathname.includes('/admin/') || url.pathname.includes('/courier/')) return;
 
   // config.js — TARMOQ BIRINCHI, lekin abadiy kutilmaydi.
   //

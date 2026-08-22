@@ -782,6 +782,13 @@ export async function assignCourier({ orderId, courierId, by }) {
   if (!orderSnap.exists) throw httpError(404, 'no-order', 'Buyurtma topilmadi');
   if (!courierSnap.exists) throw httpError(404, 'no-courier', 'Kuryer topilmadi');
 
+  // `pending_` hujjat — kuryer hali birinchi marta kirmagan, uning
+  // `uid` si yo'q. Bunday kuryerga buyurtma tayinlab bo'lmaydi: u
+  // buyurtmani ko'ra ham, statusini o'zgartira ham olmaydi.
+  if (id.startsWith('pending_')) {
+    throw httpError(409, 'courier-pending', 'Kuryer hali ilovaga kirmagan');
+  }
+
   const order = orderSnap.data();
   if (order.status === 'delivered' || order.status === 'cancelled') {
     throw httpError(409, 'order-closed', 'Buyurtma yopilgan');

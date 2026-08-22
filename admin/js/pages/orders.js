@@ -267,7 +267,12 @@ export function render() {
       }
     }
 
-    const onShift = couriers.filter((c) => c.onShift !== false);
+    // `pending_` — kuryer hali ilovaga kirmagan, unga tayinlab bo'lmaydi
+    // (servis 409 `courier-pending` qaytaradi), shuning uchun ro'yxatda
+    // ham ko'rinmaydi
+    const onShift = couriers.filter((c) => (
+      c.onShift !== false && c.active !== false && !String(c.id).startsWith('pending_')
+    ));
     if (!onShift.length) {
       modal({
         title: t('orders.assignTitle'),
