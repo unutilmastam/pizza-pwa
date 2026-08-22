@@ -1,13 +1,1 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512" role="img" aria-label="Pitsa">
-  <rect width="512" height="512" fill="#0f1115"/>
-  <g transform="translate(256 272) scale(0.72)">
-    <path d="M0 -168 L146 118 A320 320 0 0 1 -146 118 Z" fill="#f2c14e"/>
-    <path d="M0 -168 L146 118 A320 320 0 0 1 -146 118 Z" fill="none" stroke="#e2662a" stroke-width="22" stroke-linejoin="round"/>
-    <circle cx="-42" cy="6" r="21" fill="#e2412f"/>
-    <circle cx="46" cy="-18" r="17" fill="#e2412f"/>
-    <circle cx="6" cy="74" r="19" fill="#e2412f"/>
-    <circle cx="-6" cy="-72" r="14" fill="#e2412f"/>
-    <circle cx="76" cy="64" r="13" fill="#3f8f4a"/>
-    <circle cx="-84" cy="82" r="12" fill="#3f8f4a"/>
-  </g>
-</svg>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512"><rect width="512" height="512" fill="#e2662a"/><path d="M145.4 193.3 Q256.0 130.7 366.6 193.3 L256.0 388.7 Z" fill="#FFF3E2"/><circle cx="256.0" cy="259.7" r="17.5" fill="#e2662a"/><circle cx="231.1" cy="313.1" r="12.0" fill="#e2662a"/><circle cx="280.9" cy="313.1" r="12.0" fill="#e2662a"/></svg>
