@@ -20,6 +20,19 @@ import { getFirebase, STORAGE_KEYS } from './config.js';
 const MENU_TTL = 10 * 60 * 1000;
 
 /**
+ * Filial keshining muddati (ms). Stop-list shu hujjatdan olinadi,
+ * shuning uchun uzoq bo'lmasligi kerak — lekin har sahifa o'tishida
+ * tarmoqqa chiqish ham shart emas.
+ */
+const BRANCH_TTL = 3 * 60 * 1000;
+
+/** Buyurtmalar ro'yxati keshi (ms) — fonda baribir yangilanadi. */
+const ORDERS_TTL = 60 * 1000;
+
+/** Profil keshi (ms). */
+const USER_TTL = 60 * 1000;
+
+/**
  * localStorage'dan JSON o'qiydi.
  * @param {string} key
  * @returns {?object}
@@ -43,6 +56,133 @@ function writeCache(key, value) {
     localStorage.setItem(key, JSON.stringify(value));
   } catch (e) {
     /* kesh ixtiyoriy — yozilmasa ham ilova ishlaydi */
+  }
+}
+
+/* ------------------------------------------------- tarmoq va kesh qatlami */
+
+/**
+ * Bitta Firestore o'qishiga beriladigan vaqt chegarasi (ms).
+ *
+ * NEGA KERAK: Firestore SDK bir martalik o'qishga o'z chegarasini
+ * QO'YMAYDI. iPhone Safari'da ilova fonga o'tib qaytganda yoki tarmoq
+ * almashganda (Wi-Fi ↔ mobil) SDK ulanishi osilib qolishi mumkin —
+ * shunda `getDoc()` va'dasi HECH QACHON tugamaydi. Natijada sahifa
+ * skeletonda muzlab qoladi va faqat sahifani qayta yuklash yordam
+ * beradi. Chegara qo'yilgach xato qaytadi, sahifa esa keshdagi
+ * ma'lumotni ko'rsatadi yoki "qayta urinish" taklif qiladi.
+ */
+const READ_TIMEOUT = 12000;
+
+/** Seans davomidagi xotira keshi — localStorage'dan tez. */
+const memory = new Map();
+
+/** Fon rejimida ketayotgan yangilashlar — ikkilanmasin. */
+const inflight = new Map();
+
+/**
+ * Va'daga vaqt chegarasi qo'yadi.
+ * @template T
+ * @param {Promise<T>} promise
+ * @param {string} label - xato matnida ko'rinadi
+ * @param {number} [ms]
+ * @returns {Promise<T>}
+ */
+function withTimeout(promise, label, ms = READ_TIMEOUT) {
+  let timer = null;
+  const guard = new Promise((_, reject) => {
+    timer = setTimeout(() => {
+      const error = new Error(`${label}: server javob bermadi`);
+      error.code = 'timeout';
+      reject(error);
+    }, ms);
+  });
+  return Promise.race([promise, guard]).finally(() => clearTimeout(timer));
+}
+
+/**
+ * Keshdagi yozuvni oladi (avval xotira, keyin localStorage).
+ * @param {string} key
+ * @returns {?{value: *, at: number}}
+ */
+function cacheRead(key) {
+  if (memory.has(key)) return memory.get(key);
+  const stored = readCache(key);
+  if (stored && stored.at) memory.set(key, stored);
+  return stored && stored.at ? stored : null;
+}
+
+/**
+ * Keshga yozadi.
+ * @param {string} key
+ * @param {*} value
+ */
+function cacheWrite(key, value) {
+  const entry = { value, at: Date.now() };
+  memory.set(key, entry);
+  writeCache(key, entry);
+}
+
+/**
+ * "Keshdan darhol ber, fonda yangila" (stale-while-revalidate).
+ *
+ * Sahifalar tarmoqni KUTMAYDI: kesh bo'lsa ma'lumot shu zahoti
+ * qaytadi, yangisi esa fonda keladi va `onUpdate` orqali beriladi.
+ * Shu tufayli sahifalar orasida o'tish darhol bo'ladi.
+ *
+ * @template T
+ * @param {string} key - kesh kaliti
+ * @param {number} ttl - kesh yangi hisoblanadigan muddat (ms)
+ * @param {() => Promise<T>} fetcher - tarmoq so'rovi
+ * @param {?(value: T) => void} [onUpdate] - fonda yangi ma'lumot kelganda
+ * @returns {Promise<T>}
+ */
+async function swr(key, ttl, fetcher, onUpdate = null) {
+  const entry = cacheRead(key);
+  const fresh = entry && Date.now() - entry.at < ttl;
+
+  /** Tarmoqdan olib, keshni yangilaydi. */
+  const refresh = () => {
+    if (inflight.has(key)) return inflight.get(key);
+    const task = withTimeout(fetcher(), key)
+      .then((value) => {
+        cacheWrite(key, value);
+        return value;
+      })
+      .finally(() => inflight.delete(key));
+    inflight.set(key, task);
+    return task;
+  };
+
+  // Kesh yangi — tarmoqqa umuman chiqmaymiz
+  if (fresh) return entry.value;
+
+  // Kesh bor, lekin eskirgan: darhol beramiz, yangisini fonda olamiz
+  if (entry) {
+    refresh()
+      .then((value) => {
+        if (onUpdate && JSON.stringify(value) !== JSON.stringify(entry.value)) {
+          onUpdate(value);
+        }
+      })
+      .catch((e) => console.warn(`[db] fon yangilash: ${e.message}`));
+    return entry.value;
+  }
+
+  // Kesh yo'q — kutishdan boshqa iloj yo'q, lekin chegara bilan
+  return refresh();
+}
+
+/**
+ * Kesh yozuvini o'chiradi (ma'lumot o'zgargandan keyin).
+ * @param {string} key
+ */
+function cacheDrop(key) {
+  memory.delete(key);
+  try {
+    localStorage.removeItem(key);
+  } catch (e) {
+    /* kesh ixtiyoriy */
   }
 }
 
@@ -76,7 +216,8 @@ export async function getMenu(opts = {}) {
 
   try {
     const { dbx, sdk } = await getFirebase();
-    const snap = await sdk.getDoc(sdk.doc(dbx, 'menu', 'current'));
+    // Chegarasiz `getDoc()` osilib qolsa menyu abadiy skeletonda qolardi
+    const snap = await withTimeout(sdk.getDoc(sdk.doc(dbx, 'menu', 'current')), 'menu');
     if (!snap.exists()) throw new Error('menu/current hujjati topilmadi');
 
     const data = snap.data();
@@ -115,12 +256,14 @@ export function getCachedMenuVersion() {
  * Faol filiallar ro'yxati (zona polygonlari, ish vaqti, stop-list bilan).
  * @returns {Promise<object[]>}
  */
-export async function getBranches() {
-  const { dbx, sdk } = await getFirebase();
-  const snap = await sdk.getDocs(
-    sdk.query(sdk.collection(dbx, 'branches'), sdk.where('active', '==', true))
-  );
-  return snap.docs.map((d) => ({ id: d.id, ...d.data() }));
+export async function getBranches(onUpdate = null) {
+  return swr(`${STORAGE_KEYS.cache}.branches`, BRANCH_TTL, async () => {
+    const { dbx, sdk } = await getFirebase();
+    const snap = await sdk.getDocs(
+      sdk.query(sdk.collection(dbx, 'branches'), sdk.where('active', '==', true))
+    );
+    return snap.docs.map((d) => ({ id: d.id, ...d.data() }));
+  }, onUpdate);
 }
 
 /**
@@ -131,7 +274,7 @@ export async function getBranches() {
 export async function getBranch(branchId) {
   if (!branchId) return null;
   const { dbx, sdk } = await getFirebase();
-  const snap = await sdk.getDoc(sdk.doc(dbx, 'branches', branchId));
+  const snap = await withTimeout(sdk.getDoc(sdk.doc(dbx, 'branches', branchId)), 'branch');
   return snap.exists() ? { id: snap.id, ...snap.data() } : null;
 }
 
@@ -141,13 +284,15 @@ export async function getBranch(branchId) {
  * @param {?string} branchId
  * @returns {Promise<string[]>}
  */
-export async function getStopList(branchId) {
+export async function getStopList(branchId, onUpdate = null) {
   if (!branchId) return [];
-  const { dbx, sdk } = await getFirebase();
-  const snap = await sdk.getDoc(sdk.doc(dbx, 'branches', branchId));
-  if (!snap.exists()) return [];
-  const list = snap.data().stopList;
-  return Array.isArray(list) ? list : [];
+  return swr(`${STORAGE_KEYS.cache}.stop.${branchId}`, BRANCH_TTL, async () => {
+    const { dbx, sdk } = await getFirebase();
+    const snap = await sdk.getDoc(sdk.doc(dbx, 'branches', branchId));
+    if (!snap.exists()) return [];
+    const list = snap.data().stopList;
+    return Array.isArray(list) ? list : [];
+  }, onUpdate);
 }
 
 /* ----------------------------------------------------------------- banner */
@@ -165,11 +310,13 @@ export async function getBanners() {}
  * @param {string} uid
  * @returns {Promise<?object>}
  */
-export async function getUser(uid) {
+export async function getUser(uid, onUpdate = null) {
   if (!uid) return null;
-  const { dbx, sdk } = await getFirebase();
-  const snap = await sdk.getDoc(sdk.doc(dbx, 'users', uid));
-  return snap.exists() ? { uid, ...snap.data() } : null;
+  return swr(`${STORAGE_KEYS.cache}.user.${uid}`, USER_TTL, async () => {
+    const { dbx, sdk } = await getFirebase();
+    const snap = await sdk.getDoc(sdk.doc(dbx, 'users', uid));
+    return snap.exists() ? { uid, ...snap.data() } : null;
+  }, onUpdate);
 }
 
 /**
@@ -186,7 +333,7 @@ export async function getUser(uid) {
 export async function ensureUserDoc(uid, data = {}) {
   const { dbx, sdk } = await getFirebase();
   const ref = sdk.doc(dbx, 'users', uid);
-  const snap = await sdk.getDoc(ref);
+  const snap = await withTimeout(sdk.getDoc(ref), 'user');
 
   const safe = {};
   if (data.phone) safe.phone = data.phone;
@@ -195,15 +342,16 @@ export async function ensureUserDoc(uid, data = {}) {
 
   if (!snap.exists()) {
     const fresh = { name: '', ...safe };
-    await sdk.setDoc(ref, {
+    await withTimeout(sdk.setDoc(ref, {
       ...fresh,
       createdAt: sdk.serverTimestamp(),
       lastLoginAt: sdk.serverTimestamp()
-    });
+    }), 'user');
     return { uid, ...fresh };
   }
 
-  await sdk.updateDoc(ref, { ...safe, lastLoginAt: sdk.serverTimestamp() });
+  await withTimeout(sdk.updateDoc(ref, { ...safe, lastLoginAt: sdk.serverTimestamp() }), 'user');
+  cacheDrop(`${STORAGE_KEYS.cache}.user.${uid}`);
   return { uid, ...snap.data(), ...safe };
 }
 
@@ -216,7 +364,9 @@ export async function ensureUserDoc(uid, data = {}) {
  */
 export async function updateUserProfile(uid, patch) {
   const { dbx, sdk } = await getFirebase();
-  await sdk.updateDoc(sdk.doc(dbx, 'users', uid), patch);
+  await withTimeout(sdk.updateDoc(sdk.doc(dbx, 'users', uid), patch), 'profil');
+  // Kesh eskirdi — keyingi o'qishda yangisi olinsin
+  cacheDrop(`${STORAGE_KEYS.cache}.user.${uid}`);
 }
 
 /**
@@ -228,7 +378,7 @@ export async function updateUserProfile(uid, patch) {
 export async function getBonusHistory(uid, limit = 50) {
   if (!uid) return [];
   const { dbx, sdk } = await getFirebase();
-  const snap = await sdk.getDocs(sdk.collection(dbx, 'users', uid, 'bonusHistory'));
+  const snap = await withTimeout(sdk.getDocs(sdk.collection(dbx, 'users', uid, 'bonusHistory')), 'bonus');
   return byNewest(snap.docs.map((d) => ({ id: d.id, ...d.data() }))).slice(0, limit);
 }
 
@@ -243,7 +393,7 @@ export async function getBonusHistory(uid, limit = 50) {
 export async function getAddresses(uid) {
   if (!uid) return [];
   const { dbx, sdk } = await getFirebase();
-  const snap = await sdk.getDocs(sdk.collection(dbx, 'users', uid, 'addresses'));
+  const snap = await withTimeout(sdk.getDocs(sdk.collection(dbx, 'users', uid, 'addresses')), 'manzillar');
   return snap.docs.map((d) => ({ id: d.id, ...d.data() }));
 }
 
@@ -256,10 +406,10 @@ export async function getAddresses(uid) {
  */
 export async function addAddress(uid, address) {
   const { dbx, sdk } = await getFirebase();
-  const ref = await sdk.addDoc(sdk.collection(dbx, 'users', uid, 'addresses'), {
+  const ref = await withTimeout(sdk.addDoc(sdk.collection(dbx, 'users', uid, 'addresses'), {
     ...address,
     createdAt: sdk.serverTimestamp()
-  });
+  }), 'manzil');
   return ref.id;
 }
 
@@ -272,7 +422,7 @@ export async function addAddress(uid, address) {
  */
 export async function updateAddress(uid, addressId, patch) {
   const { dbx, sdk } = await getFirebase();
-  await sdk.updateDoc(sdk.doc(dbx, 'users', uid, 'addresses', addressId), patch);
+  await withTimeout(sdk.updateDoc(sdk.doc(dbx, 'users', uid, 'addresses', addressId), patch), 'manzil');
 }
 
 /**
@@ -283,13 +433,15 @@ export async function updateAddress(uid, addressId, patch) {
  */
 export async function deleteAddress(uid, addressId) {
   const { dbx, sdk } = await getFirebase();
-  await sdk.deleteDoc(sdk.doc(dbx, 'users', uid, 'addresses', addressId));
+  await withTimeout(sdk.deleteDoc(sdk.doc(dbx, 'users', uid, 'addresses', addressId)), 'manzil');
 }
 
 /* --------------------------------------------------------------- buyurtma */
 
 /** Yetkazilgan yoki bekor qilingan — bular "faol" hisoblanmaydi. */
-const FINAL_STATUSES = ['delivered', 'canceled'];
+// Servis `cancelled` (ikki L) yozadi; eski hujjatlarda `canceled`
+// uchraydi — ikkalasi ham yakuniy hisoblanadi.
+const FINAL_STATUSES = ['delivered', 'canceled', 'cancelled'];
 
 /**
  * Buyurtmalarni yangisi birinchi bo'lib saralaydi.
@@ -327,14 +479,26 @@ function toMillis(value) {
  * @param {number} [limit=20]
  * @returns {Promise<object[]>}
  */
-export async function getOrders(uid, limit = 20) {
+export async function getOrders(uid, limit = 20, onUpdate = null) {
   if (!uid) return [];
-  const { dbx, sdk } = await getFirebase();
-  const snap = await sdk.getDocs(
-    sdk.query(sdk.collection(dbx, 'orders'), sdk.where('uid', '==', uid))
-  );
-  const list = snap.docs.map((d) => ({ id: d.id, ...d.data() }));
-  return byNewest(list).slice(0, limit);
+  const all = await swr(`${STORAGE_KEYS.cache}.orders.${uid}`, ORDERS_TTL, async () => {
+    const { dbx, sdk } = await getFirebase();
+    const snap = await sdk.getDocs(
+      sdk.query(sdk.collection(dbx, 'orders'), sdk.where('uid', '==', uid))
+    );
+    return byNewest(snap.docs.map((d) => ({ id: d.id, ...d.data() })));
+  }, onUpdate ? (list) => onUpdate(list.slice(0, limit)) : null);
+
+  return all.slice(0, limit);
+}
+
+/**
+ * Buyurtmalar keshini bo'shatadi — yangi buyurtma berilganda yoki
+ * status o'zgarganda chaqiriladi, aks holda ro'yxat eskicha qoladi.
+ * @param {string} uid
+ */
+export function invalidateOrders(uid) {
+  if (uid) cacheDrop(`${STORAGE_KEYS.cache}.orders.${uid}`);
 }
 
 /**
@@ -345,7 +509,7 @@ export async function getOrders(uid, limit = 20) {
 export async function getOrder(orderId) {
   if (!orderId) return null;
   const { dbx, sdk } = await getFirebase();
-  const snap = await sdk.getDoc(sdk.doc(dbx, 'orders', orderId));
+  const snap = await withTimeout(sdk.getDoc(sdk.doc(dbx, 'orders', orderId)), 'buyurtma');
   return snap.exists() ? { id: snap.id, ...snap.data() } : null;
 }
 

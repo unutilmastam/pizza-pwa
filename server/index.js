@@ -15,7 +15,9 @@ import express from 'express';
 import { config, checkConfig, keyDiagnostics } from './src/config.js';
 import { pingDb } from './src/firebase.js';
 import { requestOtp, verifyOtp, httpError } from './src/otp.js';
-import { createOrder, updateStatus, assignCourier, PAYMENT_METHODS } from './src/orders.js';
+import {
+  createOrder, updateStatus, assignCourier, cancelOwnOrder, PAYMENT_METHODS
+} from './src/orders.js';
 import { startCron, runGuaranteeJob, runBonusJob, runReportJob } from './src/cron.js';
 import {
   cors, requireAuth, requireAdmin, requireStaff, rateLimit, errorHandler
@@ -150,6 +152,14 @@ app.patch('/api/orders/:id/status', requireAuth, requireStaff(ORDER_ROLES), wrap
     etaMinutes: req.body?.etaMinutes,
     by: req.user.uid
   });
+  res.json(result);
+}));
+
+// Mijoz O'Z buyurtmasini bekor qiladi. Xodim emas — shuning uchun
+// `requireStaff` yo'q, lekin `cancelOwnOrder()` egalikni va bosqichni
+// o'zi tekshiradi.
+app.patch('/api/orders/:id/cancel', requireAuth, rateLimit({ windowMs: 60000, max: 10 }), wrap(async (req, res) => {
+  const result = await cancelOwnOrder({ orderId: req.params.id, uid: req.user.uid });
   res.json(result);
 }));
 

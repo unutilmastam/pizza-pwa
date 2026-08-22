@@ -26,6 +26,13 @@ export const STATUSES = [
   'new', 'accepted', 'cooking', 'in_oven', 'packing', 'on_way', 'delivered'
 ];
 
+/**
+ * Mijoz O'ZI bekor qila oladigan bosqichlar.
+ * Oshxona tayyorlashni boshlagach (`cooking`) mahsulot sarflanadi —
+ * bundan keyin bekor qilishni operator hal qiladi.
+ */
+export const CUSTOMER_CANCELABLE = ['new', 'accepted'];
+
 /** Bitta buyurtmadagi eng ko'p element soni — nojo'ya so'rovlardan himoya. */
 const MAX_ITEMS = 50;
 const MAX_QTY = 30;
@@ -717,6 +724,41 @@ export async function updateStatus({ orderId, status, by, reason, etaMinutes }) 
   notifyStatus(order, status, userSnap.data()?.telegramId).catch(() => {});
 
   return { status };
+}
+
+/**
+ * Mijoz O'Z buyurtmasini bekor qiladi.
+ *
+ * Xodimning `updateStatus()` idan farqi: bu yerda EGALIK tekshiriladi
+ * va faqat erta bosqichlarda ruxsat beriladi — oshxona tayyorlashni
+ * boshlagach mijoz o'zi bekor qila olmaydi.
+ *
+ * @param {{orderId: string, uid: string}} input
+ * @returns {Promise<{status: string, orderNumber: number}>}
+ */
+export async function cancelOwnOrder({ orderId, uid }) {
+  const db = await getDb();
+  const ref = db.collection('orders').doc(orderId);
+  const snap = await ref.get();
+  if (!snap.exists) throw httpError(404, 'no-order', 'Buyurtma topilmadi');
+
+  const order = snap.data();
+  if (order.uid !== uid) throw httpError(403, 'not-yours', 'Bu buyurtma sizniki emas');
+
+  if (order.status === 'cancelled') {
+    return { status: 'cancelled', orderNumber: order.orderNumber };
+  }
+  if (!CUSTOMER_CANCELABLE.includes(order.status)) {
+    throw httpError(409, 'too-late', 'Buyurtma tayyorlanmoqda, bekor qilib bo\'lmaydi');
+  }
+
+  await updateStatus({
+    orderId,
+    status: 'cancelled',
+    by: uid,
+    reason: 'Mijoz bekor qildi'
+  });
+  return { status: 'cancelled', orderNumber: order.orderNumber };
 }
 
 /**

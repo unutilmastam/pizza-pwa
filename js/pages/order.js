@@ -10,7 +10,8 @@ import { t, pick } from '../i18n.js';
 import { el, emptyState, skeleton, toast, bottomSheet, confirm as confirmDialog, loader } from '../ui.js';
 import { formatPrice, formatDate, formatCountdown, formatPhone, toDate, haptic } from '../utils.js';
 import { APP, DEFAULT_CENTER } from '../config.js';
-import { getOrders, watchOrder, watchCourier, saveRating } from '../db.js';
+import { getOrders, watchOrder, watchCourier, saveRating, invalidateOrders } from '../db.js';
+import { cancelOrder } from '../api.js';
 import { getState, addToCart } from '../state.js';
 import { navigate, back } from '../router.js';
 
@@ -21,6 +22,19 @@ let mapInstance = null;
 
 /** Statuslar ketma-ketligi — SPEC 66. */
 const FLOW = APP.orderStatuses;
+
+/**
+ * Buyurtma bekor qilinganmi.
+ *
+ * Node servis `cancelled` (ikki L) yozadi, eski hujjatlarda esa
+ * `canceled` uchraydi — ikkalasi ham qabul qilinadi.
+ *
+ * @param {string} status
+ * @returns {boolean}
+ */
+function isCanceled(status) {
+  return status === 'cancelled' || status === 'canceled';
+}
 
 /**
  * Statusning oqimdagi o'rni.
@@ -59,7 +73,7 @@ function orderTitle(order) {
  * @returns {HTMLElement}
  */
 function orderCard(order) {
-  const canceled = order.status === 'canceled';
+  const canceled = isCanceled(order.status);
   const done = order.status === 'delivered';
 
   return el('article.card.card--pad.order-card', {
@@ -101,6 +115,21 @@ function orderCard(order) {
       })
     ])
   ]);
+}
+
+/**
+ * Bekor qilish xatosini foydalanuvchi matniga aylantiradi.
+ * @param {*} error
+ * @returns {string}
+ */
+function cancelErrorText(error) {
+  const code = String((error && error.code) || '');
+  if (code === 'too-late') return t('order.cancelTooLate');
+  if (code === 'not-yours') return t('order.cancelNotYours');
+  if (code === 'no-order') return t('order.notFound');
+  if (code === 'timeout' || code === 'network') return t('order.cancelNoServer');
+  if (code === 'no-session' || error?.status === 401) return t('auth.required');
+  return t('app.error');
 }
 
 /**
@@ -152,9 +181,11 @@ async function renderList(body) {
     return;
   }
 
-  body.replaceChildren(skeleton('list', 3));
-  try {
-    const orders = await getOrders(user.uid);
+  /**
+   * Ro'yxatni chizadi. Fonda yangi ma'lumot kelganda ham chaqiriladi.
+   * @param {object[]} orders
+   */
+  function draw(orders) {
     if (!orders.length) {
       body.replaceChildren(emptyState({
         icon: '🧾',
@@ -171,6 +202,13 @@ async function renderList(body) {
     const list = el('div.order-list');
     orders.forEach((order) => list.append(orderCard(order)));
     body.replaceChildren(list);
+  }
+
+  body.replaceChildren(skeleton('list', 3));
+  try {
+    // Kesh bo'lsa ro'yxat darhol chiqadi, yangisi fonda kelib
+    // `draw()` ni qayta chaqiradi — sahifa tarmoqni kutmaydi.
+    draw(await getOrders(user.uid, 20, draw));
   } catch (e) {
     console.error('[order] tarix yuklanmadi:', e);
     body.replaceChildren(emptyState({
@@ -197,9 +235,9 @@ function stepper(order) {
   const current = stepIndex(order.status);
   const box = el('ol.stepper-list');
 
-  if (order.status === 'canceled') {
+  if (isCanceled(order.status)) {
     return el('div.zone-info__box.zone-info__box--bad', {}, [
-      el('p', { text: t('status.canceled') })
+      el('p', { text: t(`status.${order.status}`) })
     ]);
   }
 
@@ -511,8 +549,10 @@ function renderTracking(body, orderId) {
       attrs: { type: 'button' },
       on: { click: () => repeatOrder(order) }
     }));
+    // Bekor qilish faqat `new` va `accepted` bosqichlarida — oshxona
+    // tayyorlashni boshlagach mijoz o'zi bekor qila olmaydi.
     if (canCancel) {
-      parts.push(el('button.btn.btn--ghost.btn--block', {
+      const cancelBtn = el('button.btn.btn--ghost.btn--block', {
         text: t('order.cancel'),
         attrs: { type: 'button' },
         on: {
@@ -523,12 +563,30 @@ function renderTracking(body, orderId) {
               okText: t('common.yes'),
               danger: true
             });
-            // Bekor qilish Node servis orqali bo'ladi (6-bosqich):
-            // client `orders` ga yoza olmaydi.
-            if (yes) toast(t('order.cancelSoon'));
+            if (!yes) return;
+
+            // Client `orders` ga yoza olmaydi (SPEC 3-bo'lim) — bekor
+            // qilishni Node servis bajaradi.
+            cancelBtn.disabled = true;
+            cancelBtn.textContent = t('app.loading');
+            try {
+              await cancelOrder(orderId, () => {
+                cancelBtn.textContent = t('order.cancelWaking');
+              });
+              // Ro'yxat keshi eskirdi — buyurtmalar sahifasi yangisini olsin
+              invalidateOrders(getState().user && getState().user.uid);
+              toast(t('order.cancelled'), { type: 'success' });
+              // Yangi status `onSnapshot` orqali o'zi keladi
+            } catch (e) {
+              console.error('[order] bekor qilinmadi:', e);
+              toast(cancelErrorText(e), { type: 'error' });
+              cancelBtn.disabled = false;
+              cancelBtn.textContent = t('order.cancel');
+            }
           }
         }
-      }));
+      });
+      parts.push(cancelBtn);
     }
 
     body.replaceChildren(...parts.filter(Boolean));

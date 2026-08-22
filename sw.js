@@ -4,14 +4,14 @@
  * Strategiya:
  *  - navigatsiya (HTML): tarmoq birinchi, uzilsa keshdagi app shell;
  *  - o'z statikamiz (css/js/icons): keshdan, orqa fonda yangilanadi;
- *  - `js/config.js`: FAQAT tarmoqdan, hech qachon keshlanmaydi;
+ *  - `js/config.js`: tarmoq birinchi (5 sek chegara), zaxira — kesh;
  *  - Firebase / API / xarita so'rovlari: keshlanmaydi.
  *
  * VERSION o'zgarganda eski keshlar `activate` da butunlay o'chiriladi.
  * Statik fayl mazmuni o'zgarsa — VERSION ni oshiring.
  */
 
-const VERSION = 'v10';
+const VERSION = 'v11';
 const SHELL_CACHE = `pizza-shell-${VERSION}`;
 const RUNTIME_CACHE = `pizza-runtime-${VERSION}`;
 
@@ -19,9 +19,12 @@ const RUNTIME_CACHE = `pizza-runtime-${VERSION}`;
 const CURRENT_CACHES = [SHELL_CACHE, RUNTIME_CACHE];
 
 /**
- * Hech qachon keshlanmaydigan fayllar.
- * config.js keshlansa, Firebase kalitlari eski holida qolib ketadi —
- * bu ilovani noto'g'ri loyihaga ulab qo'yadi.
+ * Keshdan HECH QACHON to'g'ridan-to'g'ri berilmaydigan fayllar.
+ *
+ * config.js uchun tarmoq javobi doim ustun: aks holda Firebase
+ * kalitlari eski holida qolib, ilova noto'g'ri loyihaga ulanib
+ * qolardi. Kesh nusxasi faqat tarmoq javob bermaganda ishlatiladi
+ * (`configResponse()`).
  */
 const NEVER_CACHE = ['/js/config.js'];
 
@@ -96,6 +99,39 @@ function isNeverCached(url) {
   return NEVER_CACHE.some((path) => url.pathname.endsWith(path));
 }
 
+/** config.js ni tarmoqdan kutish chegarasi (ms). */
+const CONFIG_TIMEOUT = 5000;
+
+/**
+ * config.js javobi: tarmoq birinchi, chegara bilan, zaxira — kesh.
+ *
+ * Kesh FAQAT tarmoq javob bermaganda ishlatiladi; muvaffaqiyatli javob
+ * har doim keshni yangilaydi.
+ *
+ * @param {Request} request
+ * @returns {Promise<Response>}
+ */
+async function configResponse(request) {
+  const cache = await caches.open(RUNTIME_CACHE);
+
+  try {
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), CONFIG_TIMEOUT);
+    const response = await fetch(request, { cache: 'no-store', signal: controller.signal })
+      .finally(() => clearTimeout(timer));
+
+    if (response && response.ok) {
+      cache.put(request, response.clone());
+      return response;
+    }
+    throw new Error(`config.js: HTTP ${response && response.status}`);
+  } catch (e) {
+    const cached = await cache.match(request);
+    if (cached) return cached;
+    throw e;
+  }
+}
+
 self.addEventListener('fetch', (event) => {
   const { request } = event;
   if (request.method !== 'GET') return;
@@ -110,9 +146,19 @@ self.addEventListener('fetch', (event) => {
   // uchun admin fayllari ham unga tushib qolmasin — chetlab o'tamiz.
   if (url.pathname.includes('/admin/')) return;
 
-  // config.js — faqat tarmoqdan, keshga umuman tegmaydi
+  // config.js — TARMOQ BIRINCHI, lekin abadiy kutilmaydi.
+  //
+  // Ilgari bu yerda faqat `fetch()` turardi. Muammosi: config.js ilova
+  // ishga tushishining KRITIK yo'lida — barcha modullar uni import
+  // qiladi. Tarmoq osilib qolsa (iPhone Safari'da fon rejimidan
+  // qaytganda ko'p uchraydi) so'rov tugamas va ilova umuman ochilmasdi;
+  // faqat sahifani tortib yangilash yordam berardi.
+  //
+  // Endi: 5 soniya ichida javob kelmasa yoki xato bo'lsa — keshdagi
+  // nusxa beriladi. Tarmoq javobi kelsa u HAR DOIM ustun turadi va
+  // keshni yangilaydi, shuning uchun "eski config" muammosi qaytmaydi.
   if (isNeverCached(url)) {
-    event.respondWith(fetch(request, { cache: 'no-store' }));
+    event.respondWith(configResponse(request));
     return;
   }
 

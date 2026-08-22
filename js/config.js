@@ -151,7 +151,13 @@ export const APP = {
 export const STORAGE_KEYS = {
   state: 'pizza.state.v1',
   menu: 'pizza.menu.v1',
-  settings: 'pizza.settings.v1'
+  settings: 'pizza.settings.v1',
+  /**
+   * Ma'lumot keshi (`js/db.js` dagi stale-while-revalidate).
+   * Sahifalar tarmoqni kutmasligi uchun filial, buyurtma va profil
+   * shu prefiks ostida saqlanadi.
+   */
+  cache: 'pizza.cache.v1'
 };
 
 /** Firebase namunalari — takroriy init bo'lmasligi uchun keshlanadi. */

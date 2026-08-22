@@ -153,6 +153,26 @@ export function createOrder(draft, opts = {}) {
   });
 }
 
+/**
+ * Buyurtmani bekor qiladi (SPEC 3-bo'lim: client `orders` ga yoza
+ * olmaydi, shuning uchun servis orqali).
+ *
+ * Servis statusni tekshiradi: faqat `new` va `accepted` bosqichida
+ * bekor qilish mumkin, keyin `order-closed` xatosi qaytadi.
+ *
+ * @param {string} orderId
+ * @param {?Function} [onSlow] - servis uyg'onayotganda chaqiriladi
+ * @returns {Promise<object>}
+ */
+export function cancelOrder(orderId, onSlow = null) {
+  return request(`/api/orders/${orderId}/cancel`, {
+    method: 'PATCH',
+    body: {},
+    auth: true,
+    onSlow
+  });
+}
+
 /** Uyg'otish so'rovi bir marta yuboriladi. */
 let wakePromise = null;
 
