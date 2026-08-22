@@ -388,18 +388,26 @@ async function resolveDelivery(db, payload, subtotal) {
 }
 
 /**
- * Navbatdagi buyurtma raqamini transaction bilan beradi.
+ * Navbatdagi buyurtma raqamini oladi — ALBATTA yozuv bilan bir
+ * transaction ichida chaqiriladi.
+ *
+ * NEGA transaction ichida: ilgari raqam alohida transaction'da olinar,
+ * buyurtma esa keyin `batch` bilan yozilardi. Batch yiqilsa (masalan
+ * promokod hujjati o'chirilgan bo'lsa) raqam sarflanib ketardi va
+ * ro'yxatda bo'shliq qolardi — №17, keyin №19. Endi hisoblagich ham,
+ * buyurtma ham bitta transaction'da: yozuv yiqilsa raqam ham
+ * o'zgarmaydi.
+ *
+ * @param {import('firebase-admin/firestore').Transaction} tx
  * @param {import('firebase-admin/firestore').Firestore} db
  * @returns {Promise<number>}
  */
-async function nextOrderNumber(db) {
+export async function claimOrderNumber(tx, db) {
   const ref = db.collection('counters').doc('orderNumber');
-  return db.runTransaction(async (tx) => {
-    const snap = await tx.get(ref);
-    const value = (snap.exists ? Number(snap.data().value) || 0 : 0) + 1;
-    tx.set(ref, { value }, { merge: true });
-    return value;
-  });
+  const snap = await tx.get(ref);
+  const value = (snap.exists ? Number(snap.data().value) || 0 : 0) + 1;
+  tx.set(ref, { value }, { merge: true });
+  return value;
 }
 
 /**
@@ -527,11 +535,10 @@ async function createOrderOnce({ uid, phone, payload }) {
     ? null
     : Timestamp.fromMillis(Date.now() + settings.guaranteeMinutes * 60000);
 
-  const orderNumber = await nextOrderNumber(db);
   const orderRef = db.collection('orders').doc();
 
+  // `orderNumber` transaction ichida qo'yiladi — pastga qarang
   const order = {
-    orderNumber,
     uid,
     phone: phone || user.phone || null,
     name: user.name || null,
@@ -572,26 +579,38 @@ async function createOrderOnce({ uid, phone, payload }) {
     deliveredAt: null
   };
 
-  // 6. Yozish — buyurtma, bonus yechilishi va promo hisoblagichi bitta batch'da
-  const batch = db.batch();
-  batch.set(orderRef, order);
+  // 6. Yozish — raqam, buyurtma, bonus yechilishi va promo hisoblagichi
+  //    BITTA transaction'da. Biror qismi yiqilsa hech biri yozilmaydi
+  //    va buyurtma raqami ham sarflanmaydi.
+  //
+  // Transaction qayta urinishi mumkin, shuning uchun bu blok ichida
+  // yangi vaqt yoki tasodifiy qiymat hisoblanmaydi — hammasi
+  // yuqorida, bir marta tayyorlangan.
+  const bonusEntryRef = userRef.collection('bonusHistory').doc();
 
-  if (bonusUsed > 0) {
-    batch.set(userRef, { bonusBalance: FieldValue.increment(-bonusUsed) }, { merge: true });
-    batch.set(userRef.collection('bonusHistory').doc(), {
-      type: 'spend',
-      amount: -bonusUsed,
-      orderId: orderRef.id,
-      createdAt: Timestamp.now()
-    });
-  }
-  if (promoRef) {
-    batch.set(promoRef, { usedCount: FieldValue.increment(1) }, { merge: true });
-  }
-  await batch.commit();
+  const orderNumber = await db.runTransaction(async (tx) => {
+    // Firestore qoidasi: transaction'da BARCHA o'qish yozuvdan oldin
+    const number = await claimOrderNumber(tx, db);
+
+    tx.set(orderRef, { ...order, orderNumber: number });
+
+    if (bonusUsed > 0) {
+      tx.set(userRef, { bonusBalance: FieldValue.increment(-bonusUsed) }, { merge: true });
+      tx.set(bonusEntryRef, {
+        type: 'spend',
+        amount: -bonusUsed,
+        orderId: orderRef.id,
+        createdAt: Timestamp.now()
+      });
+    }
+    if (promoRef) {
+      tx.set(promoRef, { usedCount: FieldValue.increment(1) }, { merge: true });
+    }
+    return number;
+  });
 
   // Telegram xabari buyurtmani to'sib qo'ymasin
-  notifyNewOrder(order).catch(() => {});
+  notifyNewOrder({ ...order, orderNumber }).catch(() => {});
 
   return { id: orderRef.id, orderNumber, total };
 }
@@ -799,13 +818,22 @@ export async function assignCourier({ orderId, courierId, by }) {
 
   const courier = courierSnap.data();
 
+  // Boshlang'ich koordinata alohida kolleksiyadan olinadi
+  // (`courierLocations/{uid}` — `firestore.rules` ga qarang).
+  const locSnap = await db.collection('courierLocations').doc(id).get();
+  const location = locSnap.exists
+    ? { lat: locSnap.data().lat, lng: locSnap.data().lng }
+    : null;
+
   const batch = db.batch();
   batch.update(orderRef, {
     courierId: id,
+    // Ism va telefon buyurtmaga KO'CHIRILADI: mijoz `couriers` ni
+    // o'qiy olmaydi, treking sahifasi shu ikki maydonni ko'rsatadi.
     courierName: courier.name ?? null,
     courierPhone: courier.phone ?? null,
     // Kuryer joylashuvi bo'lsa darhol ko'rsatiladi, keyin o'zi yangilaydi
-    courierLocation: courier.location ?? null,
+    courierLocation: location,
     assignedAt: Timestamp.now(),
     assignedBy: by
   });

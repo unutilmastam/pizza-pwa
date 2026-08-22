@@ -815,3 +815,54 @@ Bajarilgani:
   - `server/npm test` — **30 ta test o'tdi** (7 tasi yangi: `pendingId`,
     ruxsat etilgan statuslar, hisob yig'indisi).
 - README.md ga "Kuryer ilovasi" bo'limi qo'shildi.
+
+### TASHQI KO'RIKDAN KEYINGI TUZATISHLAR
+
+Ko'rikda 5 ta muammo topildi, hammasi yopildi.
+
+1. **Kuryerlar ro'yxati hammaga ochiq edi (JIDDIY).** `couriers` read
+   `signedIn()` edi — har qanday kirgan mijoz barcha kuryerlarning
+   ismi, telefoni va jonli koordinatasini o'qiy olardi.
+   Yechim: koordinata **`courierLocations/{uid}`** ga chiqarildi, unda
+   faqat `{lat, lng, at}` bor (`hasOnly` bilan majburlangan — ism yoki
+   telefonni u yerga "yashirib" qo'yish yo'li yopiq). `couriers` read
+   endi faqat egasi va `superadmin`/`manager`/`operator`. Mijoz
+   trekingi kuryerning ismi va telefonini buyurtma hujjatidan oladi
+   (`courierName`, `courierPhone` — ularni `assignCourier()` ko'chiradi).
+   `couriers` update ro'yxatidan `location` olib tashlandi.
+   > Eski `couriers` hujjatlarida qolgan `location` maydoni endi
+   > o'qilmaydi va yangilanmaydi — u zararsiz, xohlasa qo'lda tozalanadi.
+2. **Manager har qanday mijozning bonusini yoza olardi.** `users`
+   update qoidasida qavs yo'q edi: `&&` `||` dan kuchli bo'lgani uchun
+   xodim sharti egasining maydon cheklovini butunlay chetlab o'tardi.
+   Yechim: qavslar qo'yildi va xodimga ham cheklov berildi — u faqat
+   `blocked`, `notes`, `updatedAt` ni o'zgartiradi. `bonusBalance`,
+   `tier`, `totalSpent` endi HECH KIMGA ochiq emas, faqat servis.
+3. **`/api/health?deep=1` ochiq edi** — autentifikatsiyasiz Firestore'ga
+   so'rov yuborardi va `clientEmail` ni qaytarardi. Endi `deepOnly()`
+   yordamchisi bilan `requireAuth` + `requireAdmin` ostida. Oddiy
+   `/api/health` ochiq qoldi — uni Render uyqusiga qarshi tashqi ping
+   xizmati chaqiradi.
+4. **Buyurtma raqamida bo'shliq.** Raqam alohida transaction'da
+   olinardi, buyurtma esa keyin `batch` bilan yozilardi — batch yiqilsa
+   raqam sarflanib ketardi (№17, keyin №19). Endi hisoblagich ham,
+   buyurtma ham, bonus yechilishi ham, promo hisoblagichi ham BITTA
+   `runTransaction` ichida.
+5. **`SMS_PROVIDER=console`** — kodga tegilmadi (Render sozlamasi),
+   README ga ogohlantirish qo'shildi: bu rejimda kod faqat logga
+   yoziladi va mijoz ilovaga kira olmaydi.
+
+Tuzatishlardan keyin qayta tekshirildi:
+- `rules-test` — **63/63** (7 tasi yangi: mijoz `couriers` ni o'qiy
+  olmasligi, joylashuv hujjatiga ortiqcha maydon yozib bo'lmasligi,
+  xodim mijoz pul maydonlarini yoza olmasligi va h.k.);
+- `server/npm test` — **35/35** (5 tasi yangi: yozuv yiqilganda raqam
+  sarflanmasligi);
+- brauzerda mijoz trekingi, 4 guruh: kuryer ismi/telefoni buyurtmadan
+  chiqdi, `couriers` kolleksiyasiga UMUMAN tegilmadi (o'qishlar
+  ro'yxati bilan tasdiqlandi), koordinata `courierLocations` dan real
+  vaqtda ko'chdi, sahifadan chiqilganda obuna uzildi;
+- kuryer ilovasi 13 guruh va admin "Kuryerlar" 9 guruh — qaytadan
+  o'tdi, geolokatsiya endi `courierLocations` ga yozilishi va
+  hujjatda faqat uch maydon bo'lishi alohida tekshirildi;
+- `/api/health` 200, `?deep=1` tokensiz va soxta token bilan 401.

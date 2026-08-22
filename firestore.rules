@@ -159,10 +159,21 @@ service cloud.firestore {
 
       // Yaratishda ham, yangilashda ham pul maydonlariga tegib bo'lmaydi
       allow create: if isOwner(uid) && noFields(protectedUserFields());
-      allow update: if isOwner(uid)
-                       && onlyChanges(['name', 'phone', 'lang', 'birthday',
-                                       'lastLoginAt', 'updatedAt'])
-                    || hasRole(['superadmin', 'manager']);
+
+      // DIQQAT: qavslar SHART. `&&` `||` dan kuchli, shuning uchun
+      // qavssiz yozilganda xodim sharti egasining maydon cheklovini
+      // chetlab o'tar edi va manager istalgan mijozning `bonusBalance`,
+      // `totalSpent`, `blocked` maydonini yoza olar edi.
+      //
+      // Xodimga ham cheklov bor: pul maydonlari HECH KIMGA ochiq emas,
+      // ularni faqat Node servis yozadi (bonus, tier, totalSpent).
+      // Bonusni qo'lda berish kerak bo'lsa — alohida servis yo'li
+      // yozilsin, qoidalar orqali emas.
+      allow update: if (isOwner(uid)
+                        && onlyChanges(['name', 'phone', 'lang', 'birthday',
+                                        'lastLoginAt', 'updatedAt']))
+                    || (hasRole(['superadmin', 'manager'])
+                        && onlyChanges(['blocked', 'notes', 'updatedAt']));
 
       // Hujjatni o'chirish yo'q — buyurtmalar tarixi unga bog'liq
       allow delete: if false;
@@ -206,19 +217,38 @@ service cloud.firestore {
 
     /* ------------------------------------------------------- kuryer */
 
+    // Kuryerning SHAXSIY ma'lumoti: ism, telefon, filial, smena.
+    // Mijoz bu yerni O'QIMAYDI — aks holda har qanday kirgan mijoz
+    // barcha kuryerlarning ismi va telefonini ko'chirib olardi.
+    // Trekingga kerak bo'lgan ism va telefon buyurtma hujjatining
+    // o'zida bor (`courierName`, `courierPhone`), koordinata esa
+    // quyidagi `courierLocations` da.
     match /couriers/{courierId} {
-      // Mijoz treking sahifasida kuryer koordinatasini kuzatadi, xodim
-      // esa ro'yxatni ko'radi. Hujjatda ism, telefon va joylashuv bor —
-      // ular buyurtma hujjatida ham mijozga ko'rsatiladi.
-      allow read: if signedIn();
+      allow read: if isOwner(courierId)
+                     || hasRole(['superadmin', 'manager', 'operator']);
 
-      // Kuryer faqat O'Z joylashuvi va smenasini yozadi.
-      // `activeOrders` ni ham servis yozadi, lekin kuryer ilovasi
-      // buyurtmani yopganda mahalliy ro'yxatni tozalashi mumkin.
+      // Kuryer faqat O'Z smenasini yozadi. `activeOrders` ni ham servis
+      // yozadi, lekin kuryer ilovasi buyurtmani yopganda mahalliy
+      // ro'yxatni tozalashi mumkin. `location` bu yerda YO'Q.
       allow update: if isOwner(courierId)
-                       && onlyChanges(['location', 'onShift', 'activeOrders',
+                       && onlyChanges(['onShift', 'activeOrders',
                                        'shiftStartedAt', 'shiftEndedAt']);
       allow create, delete: if hasRole(['superadmin', 'manager']);
+    }
+
+    // FAQAT koordinata: `{lat, lng, at}`. Mijoz treking xaritasi shuni
+    // kuzatadi, shuning uchun kirgan foydalanuvchiga ochiq — lekin bu
+    // yerda ism ham, telefon ham, smena ham yo'q.
+    match /courierLocations/{courierId} {
+      allow read: if signedIn();
+
+      // Maydonlar ro'yxati `hasOnly` bilan tekshiriladi (`onlyChanges`
+      // emas): hujjat birinchi marta yaratilganda `resource` bo'lmaydi
+      // va `diff()` ishlamaydi.
+      allow create, update: if isOwner(courierId)
+                               && request.resource.data.keys()
+                                    .hasOnly(['lat', 'lng', 'at']);
+      allow delete: if hasRole(['superadmin', 'manager']);
     }
 
     /* ----------------------------------------------------- promokod */

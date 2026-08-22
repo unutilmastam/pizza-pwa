@@ -109,8 +109,17 @@ export async function setShift(uid, open) {
 /**
  * Joylashuvni yozadi (SPEC 127).
  *
+ * ALOHIDA kolleksiya (`courierLocations/{uid}`), `couriers` ichida
+ * emas. Sabab: mijoz treking xaritasi koordinatani real vaqtda
+ * kuzatishi kerak, ya'ni hujjat kirgan foydalanuvchiga ochiq bo'ladi.
+ * Koordinata `couriers` da qolsa, u bilan birga kuryerning ismi va
+ * telefoni ham hammaga ochilib ketardi.
+ *
+ * Hujjatda FAQAT uch maydon bo'ladi — `firestore.rules` boshqasini
+ * qabul qilmaydi.
+ *
  * Chaqiruv shartlarini `courier/js/geo.js` hal qiladi — bu yerda faqat
- * yozuv. `merge: true` bilan boshqa maydonlarga tegilmaydi.
+ * yozuv.
  *
  * @param {string} uid
  * @param {{lat: number, lng: number}} point
@@ -118,9 +127,11 @@ export async function setShift(uid, open) {
  */
 export async function saveLocation(uid, point) {
   const { dbx, sdk } = await getFirebase();
-  await withTimeout(sdk.setDoc(sdk.doc(dbx, 'couriers', uid), {
-    location: { lat: point.lat, lng: point.lng, at: sdk.serverTimestamp() }
-  }, { merge: true }), 'joylashuv');
+  await withTimeout(sdk.setDoc(sdk.doc(dbx, 'courierLocations', uid), {
+    lat: point.lat,
+    lng: point.lng,
+    at: sdk.serverTimestamp()
+  }), 'joylashuv');
 }
 
 /* ----------------------------------------------------------- buyurtma */

@@ -190,11 +190,18 @@ Render → servis → **Environment** → **Add Environment Variable**.
 | `FIREBASE_PRIVATE_KEY` | O'sha kalitning oddiy PEM varianti (`\n` bilan). Faqat base64 qo'yilmagan bo'lsa ishlatiladi |
 | `ADMIN_UIDS` | status o'zgartira oladigan uid'lar, vergul bilan |
 
-**SMS (ixtiyoriy, lekin production uchun kerak):**
+**SMS (production uchun SHART):**
+
+> ⚠️ **`SMS_PROVIDER=console` bilan mijoz ilovaga KIRA OLMAYDI.** Bu
+> rejimda OTP kodi SMS bo'lib jo'natilmaydi, faqat servis logiga
+> yoziladi — mijoz uni ko'rmaydi va kirish ekranidan o'tolmaydi.
+> `console` faqat mahalliy ishlab chiqish uchun. Production'da
+> `SMS_PROVIDER=eskiz` qo'ying va Eskiz.uz hisobini ulang; test
+> raqamlari uchun `TEST_PHONE` / `TEST_OTP_CODE` bor.
 
 | O'zgaruvchi | Izoh |
 | --- | --- |
-| `SMS_PROVIDER` | `console` (kod logga yoziladi) yoki `eskiz` |
+| `SMS_PROVIDER` | `eskiz` — production. `console` (kod logga yoziladi) faqat mahalliy ishlab chiqish uchun |
 | `ESKIZ_EMAIL`, `ESKIZ_PASSWORD` | Eskiz.uz hisobi |
 | `ESKIZ_FROM` | jo'natuvchi nomi, standart `4546` |
 | `OTP_TTL_SECONDS` | kod amal qilish muddati, standart `300` |
@@ -495,7 +502,8 @@ brauzerdagi ikki ilovaga tegishli.
 | `users/{uid}/addresses` | o'zi | o'zi |
 | `users/{uid}/bonusHistory` | o'zi; `superadmin`/`manager` | hech kim (servis yozadi) |
 | `orders` | o'zinikini; **kuryer — `courierId == uid` bo'lganini**; buyurtma xodimlari hammasini | **hech kim** — istisno: o'z yetkazilgan buyurtmasiga `rating` |
-| `couriers` | kirgan foydalanuvchi (treking uchun) | kuryer — o'z `location`, `onShift`, `activeOrders`, `shiftStartedAt`, `shiftEndedAt` |
+| `couriers` (ism, telefon, smena) | egasi; `superadmin`/`manager`/`operator` | kuryer — o'z `onShift`, `activeOrders`, `shiftStartedAt`, `shiftEndedAt` |
+| `courierLocations` (faqat `lat`, `lng`, `at`) | kirgan foydalanuvchi (treking xaritasi) | kuryer — faqat o'zinikini |
 | `promocodes` | `superadmin`, `manager` | `superadmin`, `manager` |
 | `staff` | o'z hujjatini; `superadmin` hammasini | `superadmin` |
 | `reports` | `superadmin`, `manager` | hech kim (cron yozadi) |
@@ -513,6 +521,15 @@ Muhim jihatlar:
 - **Promokodlarni client o'qiy olmaydi** — aks holda barchasini ko'chirib
   olish mumkin bo'lardi.
 - **`otps` yopiq** — unda OTP kodlarining xeshi yotadi.
+- **Kuryerning ismi va telefoni mijozga ochiq emas.** Treking xaritasi
+  faqat `courierLocations/{uid}` ni o'qiydi — u yerda `{lat, lng, at}`
+  dan boshqa hech nima yo'q. Ism va telefon buyurtma hujjatiga
+  ko'chiriladi (`courierName`, `courierPhone`), shuning uchun mijoz
+  faqat O'Z buyurtmasining kuryerini ko'radi.
+- **Mijozning pul maydonlarini xodim ham yoza olmaydi.** `users` update
+  qoidasida qavslar bor: egasi o'z profil maydonlarini, xodim esa faqat
+  `blocked` va `notes` ni o'zgartiradi. `bonusBalance`, `tier`,
+  `totalSpent` — faqat Node servis.
 - Admin panel ham buyurtmalarni **bevosita** o'zgartira olmaydi: status
   va kuryer Node servis orqali yoziladi.
 

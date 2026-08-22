@@ -60,7 +60,8 @@ async function seed() {
       uid: 'u2', orderNumber: 3, status: 'new', total: 70000, createdAt: NOW
     });
 
-    await setDoc(doc(db, 'couriers', 'c1'), { name: 'Sardor', onShift: true, location: { lat: 41.3, lng: 69.2 } });
+    await setDoc(doc(db, 'couriers', 'c1'), { name: 'Sardor', phone: '+998901112233', onShift: true });
+    await setDoc(doc(db, 'courierLocations', 'c1'), { lat: 41.3, lng: 69.2, at: new Date() });
     await setDoc(doc(db, 'couriers', 'pending_998905550011'), { name: 'Yangi', phone: '+998905550011', active: true });
     await setDoc(doc(db, 'orders', 'o4'), {
       uid: 'u2', orderNumber: 4, status: 'on_way', total: 60000, courierId: 'c1', createdAt: NOW
@@ -207,21 +208,38 @@ test('buyurtmani o\'chirib bo\'lmaydi', async () => {
 /* ================================================ MIJOZ: kuryer */
 
 test('mijoz kuryer joylashuvini kuzata oladi (treking)', async () => {
-  await assertSucceeds(getDoc(doc(asUser('u1'), 'couriers', 'c1')));
+  await assertSucceeds(getDoc(doc(asUser('u1'), 'courierLocations', 'c1')));
 });
 
-test('mehmon kuryerni ko\'rmaydi', async () => {
-  await assertFails(getDoc(doc(guest(), 'couriers', 'c1')));
+test('mehmon kuryer joylashuvini ko\'rmaydi', async () => {
+  await assertFails(getDoc(doc(guest(), 'courierLocations', 'c1')));
+});
+
+test('mijoz kuryerning ismi va telefonini O\'QIY OLMAYDI', async () => {
+  // Aks holda har qanday kirgan mijoz butun kuryerlar bazasini
+  // ko'chirib olardi. Treking uchun ism/telefon buyurtma hujjatida.
+  await assertFails(getDoc(doc(asUser('u1'), 'couriers', 'c1')));
+  await assertFails(getDocs(collection(asUser('u1'), 'couriers')));
+});
+
+test('kuryer o\'z hujjatini o\'qiy oladi', async () => {
+  await assertSucceeds(getDoc(doc(asUser('c1'), 'couriers', 'c1')));
 });
 
 test('kuryer faqat O\'Z joylashuvini yozadi', async () => {
-  await assertSucceeds(updateDoc(doc(asUser('c1'), 'couriers', 'c1'), {
-    location: { lat: 41.31, lng: 69.25 }
+  await assertSucceeds(setDoc(doc(asUser('c1'), 'courierLocations', 'c1'), {
+    lat: 41.31, lng: 69.25, at: new Date()
   }));
-  await assertFails(updateDoc(doc(asUser('u1'), 'couriers', 'c1'), {
-    location: { lat: 0, lng: 0 }
+  await assertFails(setDoc(doc(asUser('u1'), 'courierLocations', 'c1'), {
+    lat: 0, lng: 0, at: new Date()
   }));
-  await assertFails(updateDoc(doc(asUser('c1'), 'couriers', 'c1'), { name: 'Boshqa' }));
+});
+
+test('joylashuv hujjatiga ortiqcha maydon yozib bo\'lmaydi', async () => {
+  // Ism yoki telefonni shu yerga "yashirib" qo'yish yo'li yopiq
+  await assertFails(setDoc(doc(asUser('c1'), 'courierLocations', 'c1'), {
+    lat: 41.31, lng: 69.25, at: new Date(), phone: '+998901112233'
+  }));
 });
 
 /* ============================================== MIJOZ: yopiq joylar */
@@ -336,6 +354,27 @@ test('mijozlar bazasini admin o\'qiy oladi (SPEC 117)', async () => {
   await assertFails(getDoc(doc(asUser('kitchen1'), 'users', 'u1')));
 });
 
+test('xodim mijozning PUL maydonlarini yoza olmaydi', async () => {
+  // Qoidada qavslar bo'lmasa `&&` `||` dan kuchli bo'lib, xodim sharti
+  // egasining maydon cheklovini chetlab o'tar edi
+  const db = asUser('manager1');
+  await assertFails(updateDoc(doc(db, 'users', 'u1'), { bonusBalance: 999999 }));
+  await assertFails(updateDoc(doc(db, 'users', 'u1'), { tier: 'gold' }));
+  await assertFails(updateDoc(doc(db, 'users', 'u1'), { totalSpent: 0 }));
+  await assertFails(updateDoc(doc(asUser('super1'), 'users', 'u1'), { bonusBalance: 1 }));
+});
+
+test('xodim mijozni bloklaydi va izoh yozadi', async () => {
+  await assertSucceeds(updateDoc(doc(asUser('manager1'), 'users', 'u1'), {
+    blocked: true, notes: 'Bir necha marta rad etgan'
+  }));
+  await assertFails(updateDoc(doc(asUser('operator1'), 'users', 'u1'), { blocked: true }));
+});
+
+test('xodim mijozning boshqa hujjatini ham buzolmaydi', async () => {
+  await assertFails(updateDoc(doc(asUser('manager1'), 'users', 'u2'), { bonusBalance: 500000 }));
+});
+
 test('O\'CHIRILGAN xodim hech narsa qila olmaydi', async () => {
   const db = asUser('off1');
   await assertFails(setDoc(doc(db, 'menu', 'current'), { version: 99 }));
@@ -390,12 +429,18 @@ test('kuryer buyurtma statusini BEVOSITA o\'zgartira olmaydi (servis orqali)', a
 });
 
 test('kuryer smena va joylashuvini yoza oladi', async () => {
-  const db = asUser('c1');
-  await assertSucceeds(updateDoc(doc(db, 'couriers', 'c1'), {
+  await assertSucceeds(updateDoc(doc(asUser('c1'), 'couriers', 'c1'), {
     onShift: true, shiftStartedAt: new Date()
   }));
-  await assertSucceeds(updateDoc(doc(db, 'couriers', 'c1'), {
-    location: { lat: 41.32, lng: 69.26, at: new Date() }
+  await assertSucceeds(setDoc(doc(asUser('c1'), 'courierLocations', 'c1'), {
+    lat: 41.32, lng: 69.26, at: new Date()
+  }));
+});
+
+test('kuryer o\'z hujjatiga joylashuv yozib qo\'yolmaydi', async () => {
+  // `location` ro'yxatdan chiqarilgan — u alohida kolleksiyada
+  await assertFails(updateDoc(doc(asUser('c1'), 'couriers', 'c1'), {
+    location: { lat: 41.32, lng: 69.26 }
   }));
 });
 
