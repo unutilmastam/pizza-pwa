@@ -31,6 +31,8 @@ admin/                admin panel — ALOHIDA PWA (o'z manifest va SW bilan)
     api.js            Node servis (status, kuryer)
     pages/            login, dashboard, orders, kds, menu, branches, promos, reports
 server/               Node servis (Express + Firebase Admin SDK)
+firestore.rules       xavfsizlik qoidalari (konsolga qo'lda nusxalanadi)
+rules-test/           qoidalar testi (Firestore emulyatorida)
 tools/                bir martalik seed vositalari (brauzerda ochiladi)
 docs/                 SPEC, PROGRESS va demo ma'lumot fayllari
 ```
@@ -386,6 +388,110 @@ Admin SW **tarmoq birinchi** tamoyilida ishlaydi: xodim doim eng yangi
 kodni oladi, kesh faqat internet uzilganda zaxira bo'ladi. Mijoz
 ilovasidagi SW esa "keshdan ber, fonda yangila" — u admin yo'lini
 chetlab o'tadi (scope'i kengroq bo'lsa ham).
+
+## Firestore qoidalari (xavfsizlik)
+
+Qoidalar `firestore.rules` faylida. **Node servis Admin SDK orqali
+ishlaydi va qoidalarni butunlay chetlab o'tadi** — bu cheklovlar faqat
+brauzerdagi ikki ilovaga tegishli.
+
+### Kim nima qila oladi
+
+| Kolleksiya | O'qish | Yozish |
+| --- | --- | --- |
+| `menu`, `branches`, `banners`, `settings` | hamma (mehmon ham) | `superadmin`, `manager` (`settings` — faqat `superadmin`) |
+| `users/{uid}` | o'zi; `superadmin`/`manager`/`operator` | o'zi — faqat `name`, `phone`, `lang`, `birthday`, `lastLoginAt` |
+| `users/{uid}/addresses` | o'zi | o'zi |
+| `users/{uid}/bonusHistory` | o'zi; `superadmin`/`manager` | hech kim (servis yozadi) |
+| `orders` | o'zinikini; buyurtma xodimlari hammasini | **hech kim** — istisno: o'z yetkazilgan buyurtmasiga `rating` |
+| `couriers` | kirgan foydalanuvchi (treking uchun) | kuryer — o'z `location`/`onShift` |
+| `promocodes` | `superadmin`, `manager` | `superadmin`, `manager` |
+| `staff` | o'z hujjatini; `superadmin` hammasini | `superadmin` |
+| `reports` | `superadmin`, `manager` | hech kim (cron yozadi) |
+| `otps`, `counters`, `idempotency` | **hech kim** | **hech kim** |
+| qolgan hamma yo'l | **yopiq** | **yopiq** |
+
+Muhim jihatlar:
+
+- **Bonusni foydalanuvchi o'zi yoza olmaydi.** `bonusBalance`, `tier`,
+  `totalSpent`, `blocked` maydonlariga tegilsa yozuv rad etiladi —
+  yaratishda ham, yangilashda ham.
+- **Buyurtmani client yaratolmaydi.** Yagona istisno — o'z buyurtmangizga
+  baho qo'yish, va u ham faqat `status == 'delivered'` bo'lganda hamda
+  `rating` dan boshqa maydonga tegmasa.
+- **Promokodlarni client o'qiy olmaydi** — aks holda barchasini ko'chirib
+  olish mumkin bo'lardi.
+- **`otps` yopiq** — unda OTP kodlarining xeshi yotadi.
+- Admin panel ham buyurtmalarni **bevosita** o'zgartira olmaydi: status
+  va kuryer Node servis orqali yoziladi.
+
+### Joylashtirish (Firebase konsolidan qo'lda)
+
+Firebase CLI shart emas — qoidalarni konsolga nusxalash yetarli:
+
+1. `firestore.rules` faylini oching va **butun mazmunini** nusxalang.
+2. [Firebase konsoli](https://console.firebase.google.com/) → loyihangiz
+   → **Firestore Database** → yuqoridagi **Rules** yorlig'i.
+3. Tahrirlagichdagi eski matnni **butunlay** o'chirib, nusxalanganini
+   qo'ying.
+4. **Publish** ni bosing. Qoidalar bir necha soniyada kuchga kiradi.
+
+> Konsolda "Rules playground" bor — biror amalni chop etishdan oldin
+> sinab ko'rish mumkin.
+
+### MUHIM: tartib
+
+**Qoidalarni chop etishdan OLDIN birinchi superadminni yarating**,
+aks holda admin panelga kirib bo'lmay qoladi:
+
+1. Mijoz ilovasida kiring;
+2. `tools/seed-staff.html` orqali o'zingizga `superadmin` rolini bering;
+3. `/admin/` ochilishini tekshiring;
+4. **Endi** qoidalarni chop eting.
+
+Agar tartib buzilgan bo'lsa (qoidalar chop etilgan, lekin superadmin
+yo'q) — `firestore.rules` dagi `isBootstrapAdmin()` funksiyasini
+ishlating:
+
+```
+function isBootstrapAdmin() {
+  return signedIn() && request.auth.uid in [
+    'SIZNING_UID'          // izohni olib tashlang va uid'ni yozing
+  ];
+}
+```
+
+`uid` ni Firebase konsoli → **Authentication → Users** dan yoki
+`tools/seed-staff.html` sahifasidan olasiz. Qoidalarni qayta chop eting,
+`seed-staff.html` orqali rolni bering, so'ng ro'yxatni **bo'shatib**
+qoidalarni yana chop eting. Bu teshik faqat `staff` kolleksiyasiga
+ochiladi — boshqa hech qayerga (test bilan tekshirilgan).
+
+### Nima ishlamay qoladi
+
+`tools/` dagi seed vositalari qoidalar chop etilgach **ishlamaydi** —
+ular oddiy foydalanuvchi nomidan `menu` va `branches` ga yozadi.
+Bu kutilgan holat: menyu va filiallarni endi admin panelidan
+boshqarasiz. `seed-staff.html` ham faqat `superadmin` yoki bootstrap
+ro'yxatidagi uid uchun ishlaydi.
+
+### Qoidalarni sinash
+
+Qoidalar Firestore emulyatorida sinaladi (Java kerak):
+
+```bash
+cd rules-test
+npm install
+npm test
+```
+
+48 ta test: mehmon menyuni ko'radimi, mijoz o'z buyurtmalarinigina
+o'qiydimi, bonusni o'zi yoza oladimi, admin oqimni ko'radimi, o'chirilgan
+xodim to'silganmi, bootstrap yo'li ishlaydimi va hokazo.
+
+> Emulyator rad etilgan yozuvlar uchun "evaluation error" deb ham
+> yozishi mumkin — bu ma'lumot o'qiydigan qoidalarning ikki bosqichli
+> tekshirilishi, xato emas. Yakuniy natija baribir to'g'ri.
 
 ## Ma'lumotni to'ldirish
 
