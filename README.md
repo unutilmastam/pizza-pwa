@@ -19,6 +19,8 @@ js/
   auth.js             OTP va sessiya
   db.js               BARCHA Firestore chaqiruvlari faqat shu yerda
   i18n.js             uz / ru / en matnlari
+  cache.js            UCHALA ilova uchun umumiy kesh va tarmoq chegarasi
+  banner.js           bosh sahifadagi reklama karuseli
   router.js, state.js, ui.js, utils.js
   pages/              menu, product, cart, checkout, address, auth, order, profile
 admin/                admin panel — ALOHIDA PWA (o'z manifest va SW bilan)
@@ -427,6 +429,14 @@ birinchi xodim aynan shu yerdan beriladi.
   ko'chadi. Kirgan kuryerda telefon o'zgartirilmaydi.
 - **Promokodlar** — CRUD. Hujjat ID = kodning o'zi, shuning uchun kod
   yaratilgandan keyin o'zgartirilmaydi.
+
+> **Bannerlar** hozircha admin panelida emas — `banners` hujjatlari
+> Firebase konsolidan qo'lda qo'shiladi (SPEC 116, admin CRUD keyingi
+> bosqichda). Sxema: `image{uz,ru}`, `link`, `order`, `validFrom`,
+> `validTo`, `active`. `link` `#/cart` kabi ichki yo'l ham, tashqi
+> URL ham bo'lishi mumkin. Bosh sahifadagi karusel faqat `active` va
+> sana oralig'idagilarni `order` bo'yicha ko'rsatadi; mos banner
+> bo'lmasa blok umuman chizilmaydi.
 - **Hisobotlar** — `reports/{YYYY-MM-DD}` (cron yozadi) va bugungi kun
   jonli hisoblanadi. Diagramma tashqi kutubxonasiz, inline SVG.
 

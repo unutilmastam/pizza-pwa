@@ -9,12 +9,13 @@
  * - kartochka bosilsa mahsulot bottom-sheet ochiladi (`product.js`).
  */
 
-import { getMenu, getStopList } from '../db.js';
+import { getMenu, getStopList, getBanners } from '../db.js';
 import { t, pick } from '../i18n.js';
 import { el, skeleton, emptyState, toast } from '../ui.js';
 import { formatPrice, debounce, throttle, normalize } from '../utils.js';
 import { getState } from '../state.js';
 import { APP } from '../config.js';
+import { createBanner } from '../banner.js';
 
 /** Sahifa yopilganda tozalanadigan ishlar. */
 let cleanup = [];
@@ -153,13 +154,49 @@ export function render() {
   const chipBar = el('div.chips.cat-bar', { attrs: { role: 'tablist' } });
   const stickyBar = el('div.sticky-bar.menu-bar', {}, [search, chipBar]);
   const body = el('div.menu-body');
-  root.append(stickyBar, body);
+  // Banner ALOHIDA hostda: `body` qidiruv va menyu chizilganda
+  // butunlay almashadi, banner esa joyida qolishi kerak
+  const bannerHost = el('div.banner-host');
+  root.append(stickyBar, bannerHost, body);
 
   // Yuklanayotgan paytda skeleton (spinner emas)
   body.append(el('div.grid', {}, [skeleton('product', 6)]));
 
   load();
+  loadBanners();
   return root;
+
+  /**
+   * Bannerlarni yuklaydi.
+   *
+   * Menyudan ALOHIDA va uni KUTMAYDI: banner reklama, u kechiksa ham
+   * menyu ko'rinaverishi kerak. Xato bo'lsa blok umuman chizilmaydi —
+   * ekranda bo'sh joy qolmaydi.
+   */
+  async function loadBanners() {
+    /** @type {?{node: HTMLElement, destroy: Function}} */
+    let carousel = null;
+
+    /** Karuselni qayta quradi (kesh fonda yangilanganda ham). */
+    const draw = (list) => {
+      if (carousel) carousel.destroy();
+      carousel = createBanner(list);
+      bannerHost.replaceChildren();
+      if (carousel) bannerHost.append(carousel.node);
+    };
+
+    // Sahifadan chiqilganda taymer qolmasin
+    cleanup.push(() => {
+      if (carousel) carousel.destroy();
+      carousel = null;
+    });
+
+    try {
+      draw(await getBanners((fresh) => draw(fresh)));
+    } catch (e) {
+      console.warn('[menu] banner yuklanmadi:', e.message);
+    }
+  }
 
   /** Menyuni yuklaydi; xato bo'lsa o'zi ekranda ko'rsatadi. */
   async function load() {

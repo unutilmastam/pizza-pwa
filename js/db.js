@@ -283,9 +283,70 @@ export async function getStopList(branchId, onUpdate = null) {
 
 /**
  * Amal qilish muddati o'tmagan faol bannerlar, `order` bo'yicha saralangan.
+ *
+ * FILTR BRAUZERDA. Firestore'da `active == true` bilan `validFrom` va
+ * `validTo` oralig'ini birga so'rash ikkita diapazon maydonini talab
+ * qiladi — Firestore buni qo'llab-quvvatlamaydi (bitta so'rovda faqat
+ * bitta maydon bo'yicha diapazon bo'ladi). Banner soni o'nlab, shuning
+ * uchun butun kolleksiya olinib brauzerda saralanadi.
+ *
+ * @param {?(banners: object[]) => void} [onUpdate] - fonda yangilanganda
  * @returns {Promise<object[]>}
  */
-export async function getBanners() {}
+export async function getBanners(onUpdate = null) {
+  return swr(`${STORAGE_KEYS.cache}.banners`, MENU_TTL, async () => {
+    const { dbx, sdk } = await getFirebase();
+    const snap = await withTimeout(sdk.getDocs(sdk.collection(dbx, 'banners')), 'banner');
+    return snap.docs.map((d) => ({ id: d.id, ...d.data() }));
+  }, onUpdate ? (list) => onUpdate(activeBanners(list)) : null)
+    .then(activeBanners);
+}
+
+/**
+ * Faol va muddati o'tmagan bannerlarni ajratadi.
+ *
+ * `validFrom`/`validTo` yo'q bo'lsa cheklov ham yo'q deb qaraladi.
+ * Firestore `Timestamp` i ham, `Date` ham, keshdan kelgan ISO satr ham
+ * tushunilishi kerak — kesh JSON orqali o'tganda `Timestamp` satrga
+ * aylanadi.
+ *
+ * @param {object[]} list
+ * @returns {object[]}
+ */
+function activeBanners(list) {
+  const now = Date.now();
+  return (Array.isArray(list) ? list : [])
+    .filter((b) => b && b.active !== false)
+    .filter((b) => {
+      const from = limitMillis(b.validFrom);
+      const to = limitMillis(b.validTo);
+      if (from !== null && now < from) return false;
+      if (to !== null && now > to) return false;
+      return true;
+    })
+    .sort((a, b) => (Number(a.order) || 0) - (Number(b.order) || 0));
+}
+
+/**
+ * Sana chegarasini millisekundga aylantiradi.
+ *
+ * Quyidagi `toMillis()` dan FARQI: u yo'q sanani `0` deb qaytaradi
+ * (saralash uchun qulay), bu yerda esa "chegara yo'q" bilan
+ * "1970-yil" ni ajratish SHART — aks holda `validFrom` yozilmagan
+ * banner "kelajakda boshlanadi" deb noto'g'ri filtrlanardi.
+ *
+ * @param {*} value
+ * @returns {?number} chegara yo'q bo'lsa `null`
+ */
+function limitMillis(value) {
+  if (value === null || value === undefined || value === '') return null;
+  if (typeof value.toMillis === 'function') return value.toMillis();
+  if (typeof value.seconds === 'number') return value.seconds * 1000;
+  if (value instanceof Date) return value.getTime();
+  if (typeof value === 'number') return value;
+  const parsed = Date.parse(value);
+  return Number.isNaN(parsed) ? null : parsed;
+}
 
 /* ---------------------------------------------------------- foydalanuvchi */
 
