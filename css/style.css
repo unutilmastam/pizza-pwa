@@ -1170,6 +1170,113 @@ body:has(.cart-cta) .toasts {
 .badge--new { background: rgba(47, 158, 91, 0.14); color: var(--success); }
 .badge--veg { background: rgba(47, 158, 91, 0.14); color: var(--success); }
 
+/* --- Reklama banneri (10-bosqich) --- */
+
+/*
+ * Gorizontal slayd tanlangan (fade emas) — sabab `js/banner.js`
+ * boshidagi izohda: tezlik bo'yicha ikkalasi teng chiqdi, lekin
+ * swipe da barmoq yo'lakni 1:1 tortishi kerak.
+ */
+
+.banner-host:empty {
+  /* Banner bo'lmasa bo'sh joy ham qolmasin */
+  display: none;
+}
+
+.banner {
+  position: relative;
+  /*
+   * Gorizontal margin YO'Q: `.page` allaqachon `--sp-4` padding
+   * beradi. Qo'shilsa banner mahsulot kartochkalaridan ichkariroq
+   * turib qolardi (o'lchov: 32px va 16px).
+   */
+  margin: var(--sp-2) 0 0;
+  border-radius: var(--r-lg);
+  overflow: hidden;
+  background: var(--surface-2);
+  box-shadow: var(--shadow-1);
+  cursor: pointer;
+  /* Vertikal aylantirish bizniki emas — brauzerga qoldiramiz,
+     gorizontal harakatni esa o'zimiz boshqaramiz */
+  touch-action: pan-y;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.banner__track {
+  display: flex;
+  /* `transform` — kompozitorda, layout va paint talab qilmaydi */
+  transition: transform 420ms cubic-bezier(0.22, 0.61, 0.36, 1);
+  will-change: transform;
+}
+
+/* Barmoq tortayotganda animatsiya bo'lmaydi — yo'lak 1:1 ergashadi */
+.banner__track.is-dragging {
+  transition: none;
+}
+
+.banner__slide {
+  flex: 0 0 100%;
+  /* Ingichka: 16:5 — menyuni bosmaydi */
+  aspect-ratio: 16 / 5;
+}
+
+.banner__img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+/* Rasm hali yuklanmagan slayd bo'sh oq bo'lib turmasin */
+.banner__img:not([src]) {
+  background: var(--border);
+}
+
+.banner__dots {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: var(--sp-2);
+  display: flex;
+  justify-content: center;
+  gap: var(--sp-2);
+}
+
+.banner__dot {
+  position: relative;
+  width: 6px;
+  height: 6px;
+  padding: 0;
+  border: 0;
+  border-radius: var(--r-full);
+  background: rgba(255, 255, 255, 0.55);
+  box-shadow: 0 0 2px rgba(0, 0, 0, 0.35);
+  transition: width 200ms ease, background-color 200ms ease;
+  cursor: pointer;
+}
+
+.banner__dot.is-on {
+  width: 16px;
+  background: #ffffff;
+}
+
+/*
+ * Teginish maydoni 6px emas, 24px bo'lsin — nuqta kichik ko'rinadi,
+ * lekin barmoq bilan bosish qulay bo'ladi.
+ */
+.banner__dot::after {
+  content: '';
+  position: absolute;
+  width: 24px;
+  height: 24px;
+  margin: -9px 0 0 -9px;
+}
+
+.banner__dot:focus-visible {
+  outline: 2px solid var(--brand);
+  outline-offset: 2px;
+}
+
 /* --------------------------------------------------- 7. MAHSULOT OYNASI */
 
 .prod-sheet {

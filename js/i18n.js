@@ -45,6 +45,8 @@ const DICT = {
     'common.yesterday': 'Kecha',
 
     'menu.title': 'Menyu',
+    'banner.label': 'Reklama',
+    'banner.goTo': '{n}-bannerga o\'tish',
     'menu.searchPlaceholder': 'Pitsa, ichimlik, desert...',
     'menu.nothingFound': 'Hech narsa topilmadi',
     'menu.stopList': 'Hozircha mavjud emas',
@@ -290,6 +292,8 @@ const DICT = {
     'common.yesterday': 'Вчера',
 
     'menu.title': 'Меню',
+    'banner.label': 'Реклама',
+    'banner.goTo': 'Перейти к баннеру {n}',
     'menu.searchPlaceholder': 'Пицца, напитки, десерт...',
     'menu.nothingFound': 'Ничего не найдено',
     'menu.stopList': 'Сейчас недоступно',
@@ -535,6 +539,8 @@ const DICT = {
     'common.yesterday': 'Yesterday',
 
     'menu.title': 'Menu',
+    'banner.label': 'Promotions',
+    'banner.goTo': 'Go to banner {n}',
     'menu.searchPlaceholder': 'Pizza, drinks, dessert...',
     'menu.nothingFound': 'Nothing found',
     'menu.stopList': 'Currently unavailable',

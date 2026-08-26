@@ -942,3 +942,109 @@ Firebase SDK va Node servis).
 Tarmoq uzilishi sinovi: oldin admin va kuryer 20 sekunddan keyin ham
 spinner ko'rsatardi — endi uchalasi ham keshdagi ma'lumotni yoki
 "qayta urinish" tugmasini beradi. **Cheksiz spinner qolmadi.**
+
+---
+
+## Bosqich 10 — reklama banneri
+Status: **bajarildi**
+
+Mijoz ilovasining bosh sahifasida (menyu tepasida) uzun ingichka
+reklama karuseli.
+
+Ko'rinish:
+- Ekran kengligining 100% (chetlarda kichik padding)
+- Balandligi kichik — 16:5 nisbat atrofida, menyuni bosmasin
+- Yumaloq burchak, dizayn tizimidagi radius
+- Bir vaqtda BITTA rasm
+
+Animatsiya:
+- Har 5 sekundda avtomatik almashadi
+- Silliq o'tish — fade yoki gorizontal slayd (qaysi biri mobil
+  Safari da ravonroq bo'lsa, O'LCHAB tanlanadi)
+- Pastda kichik nuqtalar, joriysi ajralib turadi
+- Swipe (chapga/o'ngga surish) bilan ham almashadi
+- Foydalanuvchi surganda avto-almashish 10 sekundga to'xtaydi
+- Bosilganda `banner.link` ga o'tadi (ichki hash yo'l yoki tashqi URL)
+
+Ma'lumot:
+- Firestore `banners` kolleksiyasi (SPEC 2-bo'lim sxemasi:
+  `image{uz,ru}`, `link`, `order`, `validFrom`, `validTo`, `active`)
+- Faqat `active` va sana oralig'idagilar, `order` bo'yicha
+- Kesh: menyu bilan bir xil qoida (stale-while-revalidate)
+- Banner yo'q bo'lsa blok umuman ko'rinmasin — bo'sh joy qolmasin
+
+Texnik:
+- Rasm `loading="lazy"`, faqat joriy va keyingisi yuklansin
+- `prefers-reduced-motion` da animatsiya o'chsin, nuqtalar bilan
+  qo'lda almashtirilsin
+- Sahifadan chiqilganda taymer to'xtasin (leak bo'lmasin)
+- Fon tabga o'tganda ham to'xtasin (`visibilitychange`)
+
+Izoh:
+
+**ANIMATSIYA TANLOVI — o'lchandi.**
+
+Fade va gorizontal slayd bir xil sharoitda o'lchandi
+(`scratchpad/prof/anim-bench.*`): mobil o'lcham, DPR 3, CPU 1× / 4× /
+6× sekinlashtirilgan, har variant 24 marta almashtirildi.
+
+| CPU | fade median / p95 / max | slayd median / p95 / max |
+| --- | --- | --- |
+| 1× | 16.7 / 16.7 / 16.8 ms | 16.7 / 16.8 / 16.8 ms |
+| 4× | 16.7 / 16.8 / 25 ms | 16.7 / 16.8 / 33 ms |
+| 6× | 16.7 / 16.8 / 67 ms | 16.7 / 16.8 / 50 ms |
+
+**Natija: tezlik bo'yicha farq YO'Q.** Ikkalasi ham kompozitorda
+ketadi (`opacity` va `transform` — ikkalasi ham layout va paint
+talab qilmaydi), medianada ikkalasi ham 16.7 ms, tashlangan kadrlar
+~500 tadan 0–2 tasi — bu shovqin.
+
+> O'lchov CHEKLOVI: bu muhitda faqat Chromium bor (WebKit yuklab
+> bo'lmadi), shuning uchun bu HAQIQIY iPhone Safari emas. CPU
+> sekinlashtirilib mobil sinfga yaqinlashtirilgan.
+
+Shuning uchun tanlov FUNKSIYA bo'yicha qilindi: talabda swipe bor.
+**Slaydda barmoq yo'lakni 1:1 tortadi** — foydalanuvchi harakat
+davomida qayerda ekanini ko'radi (`is-dragging` sinfi animatsiyani
+o'chiradi, `transform` esa barmoq bilan yuradi). Fade da bunday
+tabiiy moslik yo'q — surish faqat "bo'ldi/bo'lmadi" bo'lib qolardi.
+
+Bajarilgani:
+
+- `js/banner.js` — karusel: avto-almashish (5 s), swipe, nuqtalar,
+  bosish (`#/` ichki yo'l → router, tashqi URL → yangi oyna).
+- `js/db.js` da `getBanners()` yozildi (ilgari bo'sh stub edi).
+  Filtr BRAUZERDA: Firestore bitta so'rovda ikkita diapazon maydonini
+  (`validFrom` va `validTo`) qo'llab-quvvatlamaydi. Kesh menyu bilan
+  bir xil qoida (`MENU_TTL`, stale-while-revalidate).
+- `limitMillis()` — sana chegarasi uchun. Fayldagi mavjud
+  `toMillis()` yo'q sanani `0` deb qaytaradi (saralash uchun), bu
+  yerda esa "chegara yo'q" ni "1970-yil" dan ajratish SHART, aks
+  holda `validFrom` siz banner filtrlanib ketardi.
+- `js/pages/menu.js` — banner ALOHIDA hostda: `body` qidiruvda va
+  menyu chizilganda butunlay almashadi, banner esa joyida qolishi
+  kerak. Menyuni KUTMAYDI va xato bo'lsa jim o'tadi — reklama
+  tufayli menyu kechikmasin.
+- CSS: 16:5 nisbat, `--r-lg` radius, nuqta teginish maydoni 24px.
+  Gorizontal margin YO'Q — `.page` allaqachon padding beradi
+  (o'lchovda banner kartochkalardan 16px ichkarida qolgan edi,
+  tuzatildi).
+- `js/banner.js` `sw.js` SHELL_ASSETS va `index.html` dagi
+  `modulepreload` ro'yxatiga qo'shildi (README dagi tezlik qoidasi).
+
+Tekshirildi — brauzerda, haqiqiy kod ustida, 13 guruh:
+filtrlash (`active`, `validFrom`/`validTo`, `order`, rasmsizi
+tashlanadi); banner yo'q bo'lsa blok umuman chizilmaydi va bo'sh joy
+qolmaydi; bitta bannerda nuqta ham, taymer ham yo'q; avto-almashish
+aynan 5 sekundda va oxiridan boshiga qaytadi; faqat joriy va keyingi
+rasm yuklanadi, hammasi `loading="lazy"`; nuqta bosilsa o'sha
+slaydga o'tadi; swipe chapga/o'ngga ishlaydi, chegaradan kam
+surishda almashmaydi; surgandan keyin 10 sekund pauza, keyin davom
+etadi; ichki hash yo'l, tashqi URL va bo'sh `link` uchtasi ham
+to'g'ri; `prefers-reduced-motion` da o'zi almashmaydi, nuqta bilan
+qo'lda almashadi; fon tabda taymer to'xtaydi va qaytgach davom
+etadi; sahifadan chiqilganda taymer tozalanadi (leak yo'q);
+o'lcham 358×112 (nisbat 3.20), radius 18px, bir vaqtda bitta slayd.
+
+Regressiya: kuryer, admin "Kuryerlar" va treking to'plamlari,
+`server` 35/35, `rules-test` 63/63 — hammasi o'tdi.
