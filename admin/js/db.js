@@ -190,6 +190,7 @@ export async function saveCourier(id, data) {
     'kuryer'
   );
   cache.drop('couriers');
+  writeAudit({ action: 'courier.save', target: `couriers/${ref.id}`, after: data });
   return ref.id;
 }
 
@@ -202,6 +203,7 @@ export async function deleteCourier(id) {
   const { dbx, sdk } = await getFirebase();
   await withTimeout(sdk.deleteDoc(sdk.doc(dbx, 'couriers', id)), 'kuryer');
   cache.drop('couriers');
+  writeAudit({ action: 'courier.delete', target: `couriers/${id}` });
 }
 
 /* ---------------------------------------------------------------- menyu */
@@ -239,6 +241,16 @@ export async function publishMenu(menu) {
     updatedAt: sdk.serverTimestamp()
   }), 'menyu');
   cache.drop('menu');
+  writeAudit({
+    action: 'menu.publish',
+    target: 'menu/current',
+    before: { version: Number(menu.version || 0) },
+    after: {
+      version,
+      categories: (menu.categories || []).length,
+      products: (menu.products || []).length
+    }
+  });
   return version;
 }
 
@@ -272,6 +284,7 @@ export async function saveBranch(id, data) {
     'filial'
   );
   cache.drop('branches');
+  writeAudit({ action: 'branch.save', target: `branches/${ref.id}`, after: data });
   return ref.id;
 }
 
@@ -284,6 +297,7 @@ export async function deleteBranch(id) {
   const { dbx, sdk } = await getFirebase();
   await withTimeout(sdk.deleteDoc(sdk.doc(dbx, 'branches', id)), 'filial');
   cache.drop('branches');
+  writeAudit({ action: 'branch.delete', target: `branches/${id}` });
 }
 
 /* ----------------------------------------------------------- promokod */
@@ -321,6 +335,7 @@ export async function savePromo(code, data) {
   const { dbx, sdk } = await getFirebase();
   await withTimeout(sdk.setDoc(sdk.doc(dbx, 'promocodes', code), data, { merge: true }), 'promokod');
   cache.drop('promos');
+  writeAudit({ action: 'promo.save', target: `promocodes/${code}`, after: data });
 }
 
 /**
@@ -332,6 +347,7 @@ export async function deletePromo(code) {
   const { dbx, sdk } = await getFirebase();
   await withTimeout(sdk.deleteDoc(sdk.doc(dbx, 'promocodes', code)), 'promokod');
   cache.drop('promos');
+  writeAudit({ action: 'promo.delete', target: `promocodes/${code}` });
 }
 
 /* ------------------------------------------------------------- hisobot */
@@ -351,4 +367,296 @@ export async function getReports(days = 14, onUpdate = null) {
       .sort((a, b) => a.date.localeCompare(b.date))
       .slice(-days);
   }, onUpdate);
+}
+
+/* ---------------------------------------------------------- audit log */
+
+/**
+ * Audit yozuvini qo'shadi (SPEC 121).
+ *
+ * NEGA CLIENT YOZADI: menyu, filial, promokod, banner va stop-list ni
+ * admin panel BEVOSITA Firestore'ga yozadi (SPEC 3-bo'lim), servis
+ * orqali emas. Shuning uchun ular uchun yozuvni ham shu yer qo'shadi.
+ * Servis bajaradigan amallar (bonus, broadcast) o'z yozuvini
+ * `server/src/audit.js` orqali qo'yadi.
+ *
+ * `firestore.rules` faqat QO'SHISHGA ruxsat beradi va `uid` o'z
+ * uid'iga teng bo'lishini talab qiladi — boshqa xodim nomidan yozib
+ * bo'lmaydi, mavjud yozuvni esa hech kim o'zgartira olmaydi.
+ *
+ * Audit yozilmagani uchun ASOSIY amal buzilmasin — xato faqat logga.
+ *
+ * @param {{action: string, target?: string, before?: *, after?: *}} entry
+ * @returns {Promise<void>}
+ */
+export async function writeAudit(entry) {
+  try {
+    const staff = getAuditActor();
+    if (!staff) return;
+    const { dbx, sdk } = await getFirebase();
+    await sdk.addDoc(sdk.collection(dbx, 'auditLog'), {
+      uid: staff.uid,
+      staffName: staff.name || null,
+      action: entry.action,
+      target: entry.target || null,
+      before: trimSnapshot(entry.before),
+      after: trimSnapshot(entry.after),
+      at: sdk.serverTimestamp(),
+      source: 'admin'
+    });
+  } catch (e) {
+    console.warn('[audit] yozilmadi:', e.message);
+  }
+}
+
+/**
+ * Audit yozuvini kim qoldirayotgani.
+ *
+ * `auth.js` ni import qilib bo'lmaydi — u `db.js` ni import qiladi va
+ * halqa hosil bo'lardi. Shuning uchun joriy xodimni `auth.js` shu
+ * yerga BERADI (`setAuditActor()`).
+ */
+let auditActor = null;
+
+/**
+ * Joriy xodimni belgilaydi (`admin/js/auth.js` chaqiradi).
+ * @param {?{uid: string, name?: string}} staff
+ */
+export function setAuditActor(staff) {
+  auditActor = staff;
+}
+
+/** @returns {?object} */
+function getAuditActor() {
+  return auditActor;
+}
+
+/**
+ * Katta obyektni yozuvga sig'adigan holga keltiradi.
+ *
+ * `before`/`after` butun menyu bo'lishi mumkin (yuzlab mahsulot) —
+ * to'liq saqlansa Firestore hujjat chegarasi (1 MB) yorilardi.
+ *
+ * @param {*} value
+ * @returns {*}
+ */
+function trimSnapshot(value) {
+  if (value === null || value === undefined) return null;
+  let text;
+  try {
+    text = JSON.stringify(value);
+  } catch (e) {
+    return null;
+  }
+  if (text === undefined) return null;
+  if (text.length <= 2000) return value;
+  return { truncated: true, preview: text.slice(0, 2000) };
+}
+
+/**
+ * Audit yozuvlarini oladi, yangisi birinchi.
+ *
+ * Filtr BRAUZERDA: sana va xodim bo'yicha birga so'rash kompozit
+ * indeks talab qiladi, yozuvlar soni esa kichik.
+ *
+ * @param {{limit?: number}} [opts]
+ * @returns {Promise<object[]>}
+ */
+export async function getAuditLog(opts = {}) {
+  const { dbx, sdk } = await getFirebase();
+  const snap = await withTimeout(sdk.getDocs(sdk.query(
+    sdk.collection(dbx, 'auditLog'),
+    sdk.orderBy('at', 'desc'),
+    sdk.limit(opts.limit || 200)
+  )), 'audit');
+  return snap.docs.map((d) => ({ id: d.id, ...d.data() }));
+}
+
+/* ------------------------------------------------------------- banner */
+
+/**
+ * Barcha bannerlar, `order` bo'yicha (nofaollari ham).
+ * @param {?Function} [onUpdate]
+ * @returns {Promise<object[]>}
+ */
+export async function getBanners(onUpdate = null) {
+  return cache.swr('banners', TTL.branches, async () => {
+    const { dbx, sdk } = await getFirebase();
+    const snap = await withTimeout(sdk.getDocs(sdk.collection(dbx, 'banners')), 'bannerlar');
+    return snap.docs
+      .map((d) => ({ id: d.id, ...d.data() }))
+      .sort((a, b) => (Number(a.order) || 0) - (Number(b.order) || 0));
+  }, onUpdate);
+}
+
+/**
+ * Bannerni yozadi (yangi bo'lsa yaratadi).
+ * @param {?string} id
+ * @param {object} data
+ * @returns {Promise<string>}
+ */
+export async function saveBanner(id, data) {
+  const { dbx, sdk } = await getFirebase();
+  const ref = id
+    ? sdk.doc(dbx, 'banners', id)
+    : sdk.doc(sdk.collection(dbx, 'banners'));
+  await withTimeout(
+    sdk.setDoc(ref, { ...data, updatedAt: sdk.serverTimestamp() }, { merge: true }),
+    'banner'
+  );
+  cache.drop('banners');
+  writeAudit({ action: 'banner.save', target: `banners/${ref.id}`, after: data });
+  return ref.id;
+}
+
+/**
+ * Bannerni o'chiradi.
+ * @param {string} id
+ * @returns {Promise<void>}
+ */
+export async function deleteBanner(id) {
+  const { dbx, sdk } = await getFirebase();
+  await withTimeout(sdk.deleteDoc(sdk.doc(dbx, 'banners', id)), 'banner');
+  cache.drop('banners');
+  writeAudit({ action: 'banner.delete', target: `banners/${id}` });
+}
+
+/* -------------------------------------------------------------- mijoz */
+
+/**
+ * Mijozlar ro'yxati (SPEC 117).
+ *
+ * Buyurtma soni va summasi `users` hujjatidagi maydonlardan olinadi
+ * (`orderCount`, `totalSpent`) — har mijoz uchun buyurtmalarni
+ * sanash o'nlab so'rov degani bo'lardi.
+ *
+ * @param {?Function} [onUpdate]
+ * @returns {Promise<object[]>}
+ */
+export async function getCustomers(onUpdate = null) {
+  return cache.swr('customers', TTL.couriers, async () => {
+    const { dbx, sdk } = await getFirebase();
+    const snap = await withTimeout(sdk.getDocs(sdk.collection(dbx, 'users')), 'mijozlar');
+    return snap.docs.map((d) => ({ uid: d.id, ...d.data() }));
+  }, onUpdate);
+}
+
+/**
+ * Bitta mijozning buyurtmalari, yangisi birinchi.
+ * @param {string} uid
+ * @returns {Promise<object[]>}
+ */
+export async function getCustomerOrders(uid) {
+  const { dbx, sdk } = await getFirebase();
+  const snap = await withTimeout(sdk.getDocs(sdk.query(
+    sdk.collection(dbx, 'orders'),
+    sdk.where('uid', '==', uid)
+  )), 'buyurtmalar');
+  return snap.docs
+    .map((d) => ({ id: d.id, ...d.data() }))
+    .sort((a, b) => auditMillis(b.createdAt) - auditMillis(a.createdAt));
+}
+
+/**
+ * Mijozning bonus tarixi, yangisi birinchi.
+ * @param {string} uid
+ * @returns {Promise<object[]>}
+ */
+export async function getBonusHistory(uid) {
+  const { dbx, sdk } = await getFirebase();
+  const snap = await withTimeout(
+    sdk.getDocs(sdk.collection(dbx, 'users', uid, 'bonusHistory')),
+    'bonus'
+  );
+  return snap.docs
+    .map((d) => ({ id: d.id, ...d.data() }))
+    .sort((a, b) => auditMillis(b.createdAt) - auditMillis(a.createdAt));
+}
+
+/**
+ * Qora ro'yxatga qo'shadi yoki chiqaradi (SPEC 117).
+ *
+ * FAQAT `blocked` va `notes` yoziladi — `firestore.rules` xodimga
+ * boshqa maydonni bermaydi. `bonusBalance`, `tier`, `totalSpent`
+ * faqat servis orqali o'zgaradi (`admin/js/api.js` dagi `giveBonus`).
+ *
+ * @param {string} uid
+ * @param {{blocked?: boolean, notes?: string}} patch
+ * @returns {Promise<void>}
+ */
+export async function setCustomerFlags(uid, patch) {
+  const { dbx, sdk } = await getFirebase();
+  const safe = {};
+  if (typeof patch.blocked === 'boolean') safe.blocked = patch.blocked;
+  if (typeof patch.notes === 'string') safe.notes = patch.notes.slice(0, 500);
+  safe.updatedAt = sdk.serverTimestamp();
+
+  await withTimeout(sdk.setDoc(sdk.doc(dbx, 'users', uid), safe, { merge: true }), 'mijoz');
+  cache.drop('customers');
+  writeAudit({
+    action: typeof patch.blocked === 'boolean'
+      ? (patch.blocked ? 'customer.block' : 'customer.unblock')
+      : 'customer.notes',
+    target: `users/${uid}`,
+    after: { blocked: patch.blocked, notes: patch.notes }
+  });
+}
+
+/* --------------------------------------------------------- sozlamalar */
+
+/**
+ * `settings/global` hujjatini o'qiydi (SPEC 120).
+ * @param {?Function} [onUpdate]
+ * @returns {Promise<object>}
+ */
+export async function getSettings(onUpdate = null) {
+  return cache.swr('settings', TTL.menu, async () => {
+    const { dbx, sdk } = await getFirebase();
+    const snap = await withTimeout(sdk.getDoc(sdk.doc(dbx, 'settings', 'global')), 'sozlamalar');
+    return snap.exists() ? snap.data() : {};
+  }, onUpdate);
+}
+
+/**
+ * Sozlamalarni yozadi.
+ * @param {object} data
+ * @returns {Promise<void>}
+ */
+export async function saveSettings(data) {
+  const { dbx, sdk } = await getFirebase();
+  await withTimeout(sdk.setDoc(sdk.doc(dbx, 'settings', 'global'), {
+    ...data,
+    updatedAt: sdk.serverTimestamp()
+  }, { merge: true }), 'sozlamalar');
+  cache.drop('settings');
+  writeAudit({ action: 'settings.save', target: 'settings/global', after: data });
+}
+
+/* ---------------------------------------------------------- broadcast */
+
+/**
+ * Yuborilgan broadcast xabarlari tarixi, yangisi birinchi (SPEC 119).
+ * @returns {Promise<object[]>}
+ */
+export async function getBroadcasts() {
+  const { dbx, sdk } = await getFirebase();
+  const snap = await withTimeout(sdk.getDocs(sdk.query(
+    sdk.collection(dbx, 'broadcasts'),
+    sdk.orderBy('createdAt', 'desc'),
+    sdk.limit(50)
+  )), 'broadcast');
+  return snap.docs.map((d) => ({ id: d.id, ...d.data() }));
+}
+
+/**
+ * Firestore sanasini millisekundga aylantiradi (saralash uchun).
+ * @param {*} value
+ * @returns {number}
+ */
+function auditMillis(value) {
+  if (!value) return 0;
+  if (typeof value.toMillis === 'function') return value.toMillis();
+  if (typeof value.seconds === 'number') return value.seconds * 1000;
+  const ms = new Date(value).getTime();
+  return Number.isFinite(ms) ? ms : 0;
 }

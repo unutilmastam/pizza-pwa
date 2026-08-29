@@ -1048,3 +1048,153 @@ o'lcham 358×112 (nisbat 3.20), radius 18px, bir vaqtda bitta slayd.
 
 Regressiya: kuryer, admin "Kuryerlar" va treking to'plamlari,
 `server` 35/35, `rules-test` 63/63 — hammasi o'tdi.
+
+---
+
+## Bosqich 11 — admin panelning qolgan bo'limlari
+Status: **bajarildi**
+
+SPEC 116–121.
+
+### 116. Banner CRUD
+- Ro'yxat, qo'shish, tahrirlash, o'chirish
+- Maydonlar: rasm URL (uz va ru alohida), havola, tartib raqami,
+  amal muddati (dan/gacha), faol/nofaol
+- Tartibni yuqori/past tugmalari bilan o'zgartirish
+- Oldindan ko'rish: mijoz ilovasidagidek
+- Faqat superadmin/manager
+
+### 117. Mijozlar bazasi
+- Ro'yxat: ism, telefon, buyurtmalar soni, umumiy summa, oxirgi buyurtma
+- Telefon yoki ism bo'yicha qidiruv
+- Mijozni ochganda: profil, buyurtmalar tarixi, bonus balansi
+- Qora ro'yxat (`blocked`)
+- MUHIM: pul maydonlariga (`bonusBalance`, `tier`, `totalSpent`)
+  TEGILMAYDI — `firestore.rules` ularni yopgan. Faqat `blocked` va
+  `notes` yoziladi
+- Faqat superadmin/manager/operator
+
+### 118. Bonusni qo'lda berish
+- `POST /api/admin/bonus` — `{ uid, amount, reason }`
+- Faqat superadmin/manager
+- `bonusBalance` transaction bilan o'zgaradi
+- `users/{uid}/bonusHistory` ga `type: 'gift'` yoziladi
+- Audit logga tushadi
+- Mijoz kartochkasida "Bonus berish" tugmasi
+
+### 119. Broadcast
+- Telegram xabar: hammasi / faol (30 kun) / uxlab qolgan (60 kun)
+- Matn, oldindan ko'rish, qabul qiluvchilar soni
+- Yuborishdan oldin tasdiq
+- `POST /api/admin/broadcast`, navbat bilan (Telegram limiti ~30/sek)
+- Yuborilganlar tarixi saqlanadi
+- Faqat superadmin
+
+### 120. Sozlamalar ekrani
+`settings/global`: kafolat daqiqalari, cashback foizi, bonus muddati,
+support telefoni va Telegram, minimal buyurtma va yetkazish narxi
+(zaxira qiymatlar). Faqat superadmin.
+
+### 121. Audit log
+- `auditLog/{id}`: `uid`, `staffName`, `action`, `target`, `before`,
+  `after`, `at`
+- Yoziladi: menyu, narx, promokod, filial, stop-list, bonus berish,
+  qora ro'yxat, broadcast, sozlamalar
+- Ro'yxat, sana va xodim bo'yicha filtr
+- Faqat superadmin o'qiydi, hech kim o'chira olmaydi
+- `firestore.rules` ga qo'shiladi
+
+Izoh:
+
+**AUDIT LOG POYDEVOR BO'LDI.** 116, 118, 119 va 120 ning hammasi unga
+yozadi, shuning uchun u birinchi qilindi.
+
+**Kim yozadi va NEGA shunday.** Menyu, filial, promokod, banner va
+stop-list ni admin panel BEVOSITA Firestore'ga yozadi (SPEC 3-bo'lim),
+servis orqali emas. Shuning uchun ular uchun audit yozuvini ham admin
+panel o'zi qo'shadi (`admin/js/db.js` dagi `writeAudit()`); bonus va
+broadcast esa servisda bajariladi va yozuvni `server/src/audit.js`
+qo'yadi.
+
+Qoida `auditLog` ga FAQAT qo'shishga ruxsat beradi va `uid` so'rov
+egasining uid'iga teng bo'lishini talab qiladi — boshqa xodim nomidan
+yozib bo'lmaydi. `update` va `delete` HECH KIMGA ochiq emas, hatto
+superadminga ham.
+
+> CHEKLOV, ochiq aytilgan: yovuz niyatli xodim O'Z nomidan SOXTA yozuv
+> qo'sha oladi. Buni to'liq yopish uchun menyu/filial/promokod
+> yozuvlari ham servis orqali o'tishi kerak — bu 7-bosqich
+> arxitekturasini qayta qurish, alohida ish sifatida qoldirildi.
+> Mavjud yozuvni o'zgartirish va o'chirish esa hozirning o'zida
+> imkonsiz.
+
+Bajarilgani:
+
+- **116 — banner CRUD** (`admin/js/pages/banners.js`): ro'yxat, qo'shish,
+  tahrirlash, o'chirish; rasm URL uz/ru alohida (ru bo'sh bo'lsa uz
+  ishlatiladi — mijozdagi `pick()` shunday qulaydi), havola, tartib,
+  amal muddati, faol/nofaol. Tartib DRAG emas, **yuqori/past
+  tugmalari** bilan: admin panel sensorli ekranda ham ochiladi va u
+  yerda drag ishonchsiz, tugma esa klaviatura bilan ham yuradi.
+  Ikkita qo'shni bannerning `order` i almashtiriladi — ikkita yozuv
+  yetadi. Oldindan ko'rish 16:5 nisbat va `--r-lg` radius bilan,
+  mijoz ilovasidagi karusel bilan bir xil.
+- **117 — mijozlar bazasi** (`admin/js/pages/customers.js`): ro'yxat
+  (ism, telefon, buyurtma soni, umumiy summa, oxirgi buyurtma),
+  ism/telefon qidiruvi, kartochkada profil + buyurtmalar tarixi +
+  bonus tarixi, qora ro'yxat. **Pul maydonlariga tegilmaydi**:
+  `setCustomerFlags()` faqat `blocked` va `notes` ni yozadi, boshqasi
+  qoidalar bilan yopiq.
+- **118 — bonus** (`POST /api/admin/bonus`): transaction ichida,
+  balans manfiy bo'lmaydi, sabab majburiy, `bonusHistory` ga
+  `type: 'gift'` yoziladi. Manfiy summa ham qabul qilinadi (xato
+  berilgan bonusni qaytarib olish uchun). Tugma faqat
+  superadmin/manager da ko'rinadi, servis ham rolni qayta tekshiradi.
+- **119 — broadcast** (`POST /api/admin/broadcast`): guruhlar hammasi /
+  faol (30 kun) / uxlab qolgan (60 kun); faqat Telegram ulagan va
+  bloklanmagan mijozlar. Yuborishdan oldin son ko'rsatiladi va tasdiq
+  so'raladi. **Telegram limiti** (~30 xabar/sek) — 25 tadan paket,
+  orasida 1.1 sekund pauza. Yuborish FONDA ketadi: 1000 mijozga ~45
+  sekund, so'rovni shuncha ushlab bo'lmaydi. Hujjat `sending`
+  holatida yaratiladi va `sent`/`failed` yangilanib boradi.
+- **120 — sozlamalar** (`admin/js/pages/settings.js`): kafolat, cashback,
+  bonus muddati, support telefoni va Telegram, minimal buyurtma va
+  yetkazish narxi. Oxirgi ikkitasi ZAXIRA qiymat — haqiqiysi filial
+  zonasidan olinadi. Manfiy va 100% dan katta cashback rad etiladi.
+- **121 — audit log** (`admin/js/pages/audit.js`): ro'yxat, sana va xodim
+  bo'yicha filtr, yozuvni ochib `before`/`after` ni ko'rish. Filtr
+  brauzerda (ikkita maydon bo'yicha birga so'rash kompozit indeks
+  talab qilardi). `before`/`after` 2000 belgidan uzun bo'lsa
+  qisqartiriladi — butun menyu saqlansa Firestore hujjat chegarasi
+  (1 MB) yorilardi.
+
+Rollar: superadmin hammasini; manager banner, mijozlar (broadcast,
+sozlama va auditsiz); operator faqat mijozlar bazasini (qo'ng'iroqda
+kim ekanini bilishi kerak).
+
+Tekshirildi:
+- `rules-test` — **70/70** (7 tasi yangi: audit faqat superadminga
+  o'qiladi, xodim o'z nomidan qo'sha oladi, BOSHQA nomidan yoza
+  olmaydi, xodim bo'lmagan qo'sholmaydi, hech kim o'zgartira va
+  o'chira olmaydi; broadcast tarixini faqat superadmin o'qiydi va
+  client unga yoza olmaydi);
+- `server/npm test` — **43/43** (8 tasi yangi: bonus qo'shish va
+  ayirish, manfiy balans rad etilishi va yiqilganda balans
+  o'zgarmasligi, sababsiz/nol/juda katta summa, mavjud bo'lmagan
+  mijoz, auditoriya tanlash uchta guruh bo'yicha). Modul mock'i uchun
+  `npm test` ga `--experimental-test-module-mocks` qo'shildi;
+- brauzerda, haqiqiy admin kodi ustida, 6 guruh: rollar (superadmin
+  hammasini ko'radi, manager broadcast/sozlama/auditni ko'rmaydi,
+  operator faqat mijozlarni, manager audit sahifasiga kira olmaydi);
+  banner CRUD (yozuv, ru→uz qulash, avtomatik tartib, rasmsiz va
+  teskari sana rad etilishi, tartib almashtirish, o'chirish);
+  mijozlar (qidiruv, kartochka, bonus servisga ketishi va Firestore
+  ga BEVOSITA yozilmasligi, faqat `blocked` va `updatedAt` yozilishi,
+  operatorda bonus tugmasi yo'qligi); broadcast (son, guruh
+  almashuvi, oldindan ko'rish, tasdiq, bo'sh matn va bekor qilish);
+  sozlamalar (yuklash, saqlash, manfiy va 100%+ rad etilishi); audit
+  (tartib, tarjima, servis belgisi, xodim va sana filtri,
+  `before`/`after`);
+- regressiya: banner, kuryer, treking va admin "Kuryerlar" to'plamlari
+  o'tdi (oxirgisida bo'lim soni 8 dan 13 ga o'zgargani uchun
+  tekshiruv yangilandi).

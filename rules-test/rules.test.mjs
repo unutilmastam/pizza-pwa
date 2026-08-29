@@ -71,6 +71,12 @@ async function seed() {
     await setDoc(doc(db, 'counters', 'orderNumber'), { value: 42 });
     await setDoc(doc(db, 'otps', '998901234567'), { codeHash: 'xxx', attempts: 0 });
     await setDoc(doc(db, 'idempotency', 'k1'), { uid: 'u1', status: 'done' });
+    await setDoc(doc(db, 'auditLog', 'a1'), {
+      uid: 'super1', staffName: 'Bosh admin', action: 'menu.publish', at: NOW
+    });
+    await setDoc(doc(db, 'broadcasts', 'bc1'), {
+      text: 'Salom', audience: 'all', total: 10, sent: 10, failed: 0, status: 'done'
+    });
   });
 }
 
@@ -451,6 +457,56 @@ test('kuryer o\'z hujjatida boshqa maydonga tegolmaydi', async () => {
 
 test('kuryer BOSHQA kuryerning hujjatini yoza olmaydi', async () => {
   await assertFails(updateDoc(doc(asUser('u1'), 'couriers', 'c1'), { onShift: false }));
+});
+
+/* ================================================ AUDIT LOG (SPEC 121) */
+
+test('audit yozuvini faqat superadmin o\'qiydi', async () => {
+  await assertSucceeds(getDocs(collection(asUser('super1'), 'auditLog')));
+  await assertFails(getDocs(collection(asUser('manager1'), 'auditLog')));
+  await assertFails(getDocs(collection(asUser('operator1'), 'auditLog')));
+  await assertFails(getDocs(collection(asUser('u1'), 'auditLog')));
+});
+
+test('xodim audit yozuvi qo\'sha oladi', async () => {
+  await assertSucceeds(addDoc(collection(asUser('manager1'), 'auditLog'), {
+    uid: 'manager1', staffName: 'Menejer', action: 'menu.publish', at: new Date()
+  }));
+});
+
+test('BOSHQA xodim nomidan audit yozib bo\'lmaydi', async () => {
+  await assertFails(addDoc(collection(asUser('manager1'), 'auditLog'), {
+    uid: 'super1', staffName: 'Bosh admin', action: 'menu.publish', at: new Date()
+  }));
+});
+
+test('xodim bo\'lmagan audit yozuvi qo\'sholmaydi', async () => {
+  await assertFails(addDoc(collection(asUser('u1'), 'auditLog'), {
+    uid: 'u1', action: 'menu.publish', at: new Date()
+  }));
+});
+
+test('audit yozuvini HECH KIM o\'zgartira va o\'chira olmaydi', async () => {
+  // Superadmin ham emas — yozuv kirgandan keyin o'zgarmas bo'lib qoladi
+  await assertFails(updateDoc(doc(asUser('super1'), 'auditLog', 'a1'), { action: 'boshqa' }));
+  await assertFails(deleteDoc(doc(asUser('super1'), 'auditLog', 'a1')));
+  await assertFails(deleteDoc(doc(asUser('manager1'), 'auditLog', 'a1')));
+});
+
+/* ================================================ BROADCAST (SPEC 119) */
+
+test('broadcast tarixini faqat superadmin o\'qiydi', async () => {
+  await assertSucceeds(getDocs(collection(asUser('super1'), 'broadcasts')));
+  await assertFails(getDocs(collection(asUser('manager1'), 'broadcasts')));
+  await assertFails(getDocs(collection(asUser('u1'), 'broadcasts')));
+});
+
+test('broadcast hujjatini client yoza olmaydi', async () => {
+  // Uni faqat servis yaratadi va yangilab boradi
+  await assertFails(setDoc(doc(asUser('super1'), 'broadcasts', 'b9'), {
+    text: 'soxta', audience: 'all', total: 1
+  }));
+  await assertFails(updateDoc(doc(asUser('super1'), 'broadcasts', 'bc1'), { sent: 999 }));
 });
 
 test('pending hujjatni faqat admin yaratadi va o\'chiradi', async () => {
