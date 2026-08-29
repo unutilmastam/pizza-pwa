@@ -22,6 +22,7 @@ import { startCron, runGuaranteeJob, runBonusJob, runReportJob } from './src/cro
 import {
   claimCourier, courierUpdateStatus, courierReport
 } from './src/couriers.js';
+import { giveBonus, startBroadcast, audienceUsers, AUDIENCES } from './src/admin.js';
 import {
   cors, requireAuth, requireAdmin, requireStaff, rateLimit, errorHandler
 } from './src/middleware.js';
@@ -209,6 +210,44 @@ app.get('/api/courier/report', requireAuth, wrap(async (req, res) => {
   const report = await courierReport({ uid: req.user.uid, date: req.query.date });
   res.json(report);
 }));
+
+/* ------------------------------------------------------------- admin */
+
+// Bonusni qo'lda berish (SPEC 118).
+//
+// NEGA SERVISDA: `firestore.rules` `bonusBalance` ni hech kimga
+// ochmaydi — xodimga ham. Bonus faqat shu yerdan o'zgaradi va har
+// safar audit logga tushadi.
+app.post('/api/admin/bonus', requireAuth, requireStaff(['superadmin', 'manager']),
+  rateLimit({ windowMs: 60000, max: 30 }), wrap(async (req, res) => {
+    const result = await giveBonus({
+      uid: String(req.body?.uid || ''),
+      amount: req.body?.amount,
+      reason: String(req.body?.reason || ''),
+      by: { uid: req.staff.uid, name: req.staff.name || null }
+    });
+    res.json(result);
+  }));
+
+// Broadcast qabul qiluvchilari soni — yuborishdan OLDIN ko'rsatiladi
+app.get('/api/admin/broadcast/audience', requireAuth, requireStaff(['superadmin']),
+  wrap(async (req, res) => {
+    const audience = String(req.query.audience || 'all');
+    const users = await audienceUsers(audience);
+    res.json({ audience, total: users.length, audiences: AUDIENCES });
+  }));
+
+// Broadcast yuborish (SPEC 119). Yuborish FONDA ketadi — 1000 mijozga
+// ~45 sekund, so'rovni shuncha ushlab turib bo'lmaydi.
+app.post('/api/admin/broadcast', requireAuth, requireStaff(['superadmin']),
+  rateLimit({ windowMs: 300000, max: 5 }), wrap(async (req, res) => {
+    const result = await startBroadcast({
+      text: String(req.body?.text || ''),
+      audience: String(req.body?.audience || 'all'),
+      by: { uid: req.staff.uid, name: req.staff.name || null }
+    });
+    res.json(result);
+  }));
 
 // Kuryer tayinlash (SPEC 110)
 app.patch('/api/orders/:id/courier', requireAuth, requireStaff(DISPATCH_ROLES), wrap(async (req, res) => {

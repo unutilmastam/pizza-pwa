@@ -268,6 +268,45 @@ service cloud.firestore {
       allow write: if hasRole(['superadmin']) || isBootstrapAdmin();
     }
 
+    /* ---------------------------------------------------- audit log */
+
+    /*
+     * Kim nima o'zgartirganining yozuvi (SPEC 121).
+     *
+     * QO'SHIB BO'LADI, O'ZGARTIRIB VA O'CHIRIB BO'LMAYDI. `update` va
+     * `delete` HECH KIMGA ochiq emas — hatto superadminga ham. Yozuv
+     * kirgandan keyin u o'zgarmas bo'lib qoladi.
+     *
+     * NEGA XODIM O'ZI YOZADI: menyu, filial, promokod va stop-list ni
+     * admin panel BEVOSITA Firestore'ga yozadi (SPEC 3-bo'lim), servis
+     * orqali emas. Shuning uchun ular uchun audit yozuvini ham xodim
+     * o'zi qo'shadi. Xavf cheklangan: `uid` o'z uid'iga teng bo'lishi
+     * SHART, ya'ni boshqa xodim nomidan yozib bo'lmaydi; mavjud
+     * yozuvni esa hech kim o'zgartira ham, o'chira ham olmaydi.
+     *
+     * Servis yozadigan amallar (bonus berish, broadcast) Admin SDK
+     * orqali ketadi va bu qoidalarni chetlab o'tadi.
+     *
+     * CHEKLOV: yovuz niyatli xodim SOXTA yozuv qo'sha oladi (o'z
+     * nomidan). Buni to'liq yopish uchun barcha yozuvlar servis orqali
+     * o'tishi kerak — bu 7-bosqich arxitekturasini qayta qurishni
+     * talab qiladi va alohida ish sifatida qoldirildi.
+     */
+    match /auditLog/{entryId} {
+      allow read: if hasRole(['superadmin']);
+      allow create: if isStaff()
+                       && request.resource.data.uid == request.auth.uid
+                       && request.resource.data.action is string;
+      allow update, delete: if false;
+    }
+
+    // Yuborilgan broadcast xabarlari tarixi (SPEC 119).
+    // Yozuvni SERVIS yaratadi va yuborish davomida yangilab boradi.
+    match /broadcasts/{id} {
+      allow read: if hasRole(['superadmin']);
+      allow write: if false;
+    }
+
     /* ------------------------------------------------------ hisobot */
 
     match /reports/{date} {

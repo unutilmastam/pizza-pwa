@@ -14,7 +14,7 @@
 
 import { getFirebase } from './config.js';
 import { ROLE_SECTIONS } from './config.js';
-import { getStaff, peekStaff, clearCache } from './db.js';
+import { getStaff, peekStaff, clearCache, setAuditActor } from './db.js';
 import { request } from './api.js';
 
 /** @type {?object} joriy xodim: {uid, role, name, branchIds, active} */
@@ -73,8 +73,15 @@ export function subscribe(fn) {
   return () => listeners.delete(fn);
 }
 
-/** Kuzatuvchilarga xabar beradi. */
+/**
+ * Kuzatuvchilarga xabar beradi.
+ *
+ * Audit yozuvining muallifini ham shu yerda belgilaymiz: `db.js`
+ * `auth.js` ni import qila olmaydi (halqa bo'lardi), shuning uchun
+ * joriy xodimni unga BIZ beramiz.
+ */
 function emit() {
+  setAuditActor(staff ? { uid: staff.uid, name: staff.name || null } : null);
   listeners.forEach((fn) => fn(staff));
 }
 

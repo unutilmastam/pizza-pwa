@@ -32,7 +32,8 @@ admin/                admin panel — ALOHIDA PWA (o'z manifest va SW bilan)
     db.js             admin uchun BARCHA Firestore chaqiruvlari
     api.js            Node servis (status, kuryer)
     pages/            login, dashboard, orders, kds, menu, branches,
-                      couriers, promos, reports
+                      couriers, banners, promos, customers, broadcast,
+                      reports, settings, audit
 courier/              kuryer ilovasi — ALOHIDA PWA (o'z manifest va SW bilan)
   index.html
   css/courier.css
@@ -154,6 +155,9 @@ va nima yetishmayotganini `problems` ro'yxatida ko'rsatadi.
 | `POST` | `/api/courier/claim` | Firebase ID token (kuryer) |
 | `PATCH` | `/api/orders/:id/courier-status` | kuryer — faqat o'ziniki, `on_way`/`delivered` |
 | `GET` | `/api/courier/report` (`?date=YYYY-MM-DD`) | kuryer |
+| `POST` | `/api/admin/bonus` | staff: superadmin, manager |
+| `GET` | `/api/admin/broadcast/audience` (`?audience=all\|active\|sleeping`) | staff: superadmin |
+| `POST` | `/api/admin/broadcast` | staff: superadmin |
 | `POST` | `/api/jobs/:name` (`guarantee`, `bonus`, `report`) | `ADMIN_UIDS` |
 
 Xato javobi doim bir xil ko'rinishda:
@@ -430,13 +434,26 @@ birinchi xodim aynan shu yerdan beriladi.
 - **Promokodlar** — CRUD. Hujjat ID = kodning o'zi, shuning uchun kod
   yaratilgandan keyin o'zgartirilmaydi.
 
-> **Bannerlar** hozircha admin panelida emas — `banners` hujjatlari
-> Firebase konsolidan qo'lda qo'shiladi (SPEC 116, admin CRUD keyingi
-> bosqichda). Sxema: `image{uz,ru}`, `link`, `order`, `validFrom`,
-> `validTo`, `active`. `link` `#/cart` kabi ichki yo'l ham, tashqi
-> URL ham bo'lishi mumkin. Bosh sahifadagi karusel faqat `active` va
-> sana oralig'idagilarni `order` bo'yicha ko'rsatadi; mos banner
-> bo'lmasa blok umuman chizilmaydi.
+- **Bannerlar** — CRUD. Rasm URL uz va ru uchun alohida (ru bo'sh
+  bo'lsa uz ishlatiladi), havola ichki (`#/cart`) yoki tashqi
+  (`https://…`), amal muddati va tartib. Tartib yuqori/past tugmalari
+  bilan o'zgaradi. Bosh sahifadagi karusel faqat `active` va sana
+  oralig'idagilarni `order` bo'yicha ko'rsatadi; mos banner bo'lmasa
+  blok umuman chizilmaydi.
+- **Mijozlar** — ro'yxat, qidiruv, kartochkada profil, buyurtmalar va
+  bonus tarixi, qora ro'yxat, bonus berish. **Pul maydonlari
+  (`bonusBalance`, `tier`, `totalSpent`) bu yerdan yozilmaydi** —
+  qoidalar ularni yopgan; bonus faqat `POST /api/admin/bonus` orqali
+  o'zgaradi.
+- **Xabar yuborish** — Telegram broadcast: hammasi / faol (30 kun) /
+  uxlab qolgan (60 kun). Yuborishdan oldin qabul qiluvchilar soni
+  ko'rsatiladi va tasdiq so'raladi. Yuborish servisda, fonda, Telegram
+  limitiga (~30 xabar/sek) rioya qilib ketadi.
+- **Sozlamalar** — `settings/global`: kafolat, cashback, bonus
+  muddati, support aloqasi, zaxira yetkazish qiymatlari. Faqat
+  superadmin.
+- **Audit log** — kim nima o'zgartirgani. Faqat superadmin o'qiydi;
+  yozuvni **hech kim** o'zgartira ham, o'chira ham olmaydi.
 - **Hisobotlar** — `reports/{YYYY-MM-DD}` (cron yozadi) va bugungi kun
   jonli hisoblanadi. Diagramma tashqi kutubxonasiz, inline SVG.
 
@@ -533,6 +550,8 @@ brauzerdagi ikki ilovaga tegishli.
 | `users/{uid}/bonusHistory` | o'zi; `superadmin`/`manager` | hech kim (servis yozadi) |
 | `orders` | o'zinikini; **kuryer — `courierId == uid` bo'lganini**; buyurtma xodimlari hammasini | **hech kim** — istisno: o'z yetkazilgan buyurtmasiga `rating` |
 | `couriers` (ism, telefon, smena) | egasi; `superadmin`/`manager`/`operator` | kuryer — o'z `onShift`, `activeOrders`, `shiftStartedAt`, `shiftEndedAt` |
+| `auditLog` | `superadmin` | xodim faqat QO'SHADI (o'z `uid` i bilan); o'zgartirish va o'chirish — **hech kimga** |
+| `broadcasts` | `superadmin` | hech kim (servis yozadi) |
 | `courierLocations` (faqat `lat`, `lng`, `at`) | kirgan foydalanuvchi (treking xaritasi) | kuryer — faqat o'zinikini |
 | `promocodes` | `superadmin`, `manager` | `superadmin`, `manager` |
 | `staff` | o'z hujjatini; `superadmin` hammasini | `superadmin` |
@@ -560,6 +579,12 @@ Muhim jihatlar:
   qoidasida qavslar bor: egasi o'z profil maydonlarini, xodim esa faqat
   `blocked` va `notes` ni o'zgartiradi. `bonusBalance`, `tier`,
   `totalSpent` — faqat Node servis.
+- **Audit log o'zgarmas.** `auditLog` ga faqat QO'SHIB bo'ladi va
+  `uid` so'rov egasiniki bo'lishi shart — boshqa xodim nomidan yozib
+  bo'lmaydi. Mavjud yozuvni na o'zgartirish, na o'chirish mumkin.
+  > Cheklov: xodim O'Z nomidan soxta yozuv qo'sha oladi. Buni to'liq
+  > yopish uchun menyu/filial/promokod yozuvlari ham servis orqali
+  > o'tishi kerak — hozircha admin panel ularni bevosita yozadi.
 - Admin panel ham buyurtmalarni **bevosita** o'zgartira olmaydi: status
   va kuryer Node servis orqali yoziladi.
 

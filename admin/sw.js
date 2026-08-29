@@ -13,7 +13,7 @@
  * boshqaradi. Ildizdagi SW ham `/admin/` yo'lini chetlab o'tadi.
  */
 
-const VERSION = 'v3';
+const VERSION = 'v4';
 const SHELL_CACHE = `pizza-admin-${VERSION}`;
 
 /**
@@ -42,6 +42,11 @@ const SHELL_ASSETS = [
   './js/pages/menu.js',
   './js/pages/branches.js',
   './js/pages/couriers.js',
+  './js/pages/banners.js',
+  './js/pages/customers.js',
+  './js/pages/broadcast.js',
+  './js/pages/settings.js',
+  './js/pages/audit.js',
   './js/pages/promos.js',
   './js/pages/reports.js',
   '../js/router.js',

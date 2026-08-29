@@ -131,3 +131,46 @@ export function wakeUp() {
   }
   return wakePromise;
 }
+
+/**
+ * Bonusni qo'lda beradi yoki ayiradi (SPEC 118).
+ *
+ * NEGA SERVIS ORQALI: `firestore.rules` `bonusBalance` ni hech kimga
+ * ochmaydi — xodimga ham. Balans faqat servisda, transaction ichida
+ * o'zgaradi va har safar audit logga tushadi.
+ *
+ * @param {{uid: string, amount: number, reason: string}} input
+ * @returns {Promise<{bonusBalance: number, amount: number}>}
+ */
+export function giveBonus({ uid, amount, reason }) {
+  return request('/api/admin/bonus', {
+    method: 'POST',
+    body: { uid, amount, reason }
+  });
+}
+
+/**
+ * Broadcast qabul qiluvchilari sonini oladi (yuborishdan oldin).
+ * @param {string} audience - `all` | `active` | `sleeping`
+ * @returns {Promise<{audience: string, total: number}>}
+ */
+export function getAudience(audience) {
+  return request(`/api/admin/broadcast/audience?audience=${encodeURIComponent(audience)}`);
+}
+
+/**
+ * Broadcast yuborishni boshlaydi (SPEC 119).
+ *
+ * Servis darhol javob qaytaradi va yuborishni FONDA davom ettiradi —
+ * 1000 mijozga ~45 sekund ketadi (Telegram limiti). Holatni tarixdan
+ * ko'rish mumkin.
+ *
+ * @param {{text: string, audience: string}} input
+ * @returns {Promise<{id: string, total: number}>}
+ */
+export function sendBroadcast({ text, audience }) {
+  return request('/api/admin/broadcast', {
+    method: 'POST',
+    body: { text, audience }
+  });
+}

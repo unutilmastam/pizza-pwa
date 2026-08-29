@@ -202,7 +202,12 @@ function startRouter() {
   registerSection('/branches', 'branches', () => import('./pages/branches.js'));
   registerSection('/couriers', 'couriers', () => import('./pages/couriers.js'));
   registerSection('/promos', 'promos', () => import('./pages/promos.js'));
+  registerSection('/banners', 'banners', () => import('./pages/banners.js'));
+  registerSection('/customers', 'customers', () => import('./pages/customers.js'));
+  registerSection('/broadcast', 'broadcast', () => import('./pages/broadcast.js'));
   registerSection('/reports', 'reports', () => import('./pages/reports.js'));
+  registerSection('/settings', 'settings', () => import('./pages/settings.js'));
+  registerSection('/audit', 'audit', () => import('./pages/audit.js'));
 
   registerNotFound(() => ({
     render: () => emptyState({ icon: '🤷', title: t('app.notFound'), hint: location.hash })
